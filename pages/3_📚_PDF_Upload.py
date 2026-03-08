@@ -41,19 +41,25 @@ def extract_text_from_pdf(pdf_file) -> str:
 
 def render():
     """PDF upload and processing page with RAG integration"""
-    # ADD THESE TWO LINES RIGHT HERE:
-    if 'pdf_count' not in st.session_state:
+    # --- SAFETY INITIALIZATION ---
+    if "analytics" not in st.session_state:
+        # Import analytics class
+        from monitoring_analytics import Analytics
+        st.session_state.analytics = Analytics()
+    
+    if "pdf_count" not in st.session_state:
         st.session_state.pdf_count = 0
+    
+    if "rag_engine" not in st.session_state:
+        # This prevents the "RAG Engine not initialized" error
+        from aws_config import USE_AWS
+        st.session_state.rag_engine = RAGEngine(use_aws=USE_AWS)
+    # -----------------------------
     
     st.markdown("## 📚 PDF Upload & Processing")
     st.markdown("Upload your lab manuals, documentation, or study materials for intelligent text extraction and analysis.")
     
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Initialize RAG engine in session state
-    if 'rag_engine' not in st.session_state:
-        from aws_config import USE_AWS
-        st.session_state.rag_engine = RAGEngine(use_aws=USE_AWS)
     
     col1, col2 = st.columns([2, 1])
     
