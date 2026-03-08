@@ -30,6 +30,16 @@ def render():
     if "translation_engine" not in st.session_state:
         from translation_engine import TranslationEngine
         st.session_state.translation_engine = TranslationEngine()
+    
+    if "analytics" not in st.session_state:
+        from monitoring_analytics import UsageAnalytics
+        st.session_state.analytics = UsageAnalytics()
+    
+    if "conversation_history" not in st.session_state:
+        st.session_state.conversation_history = []
+    
+    if "translation_count" not in st.session_state:
+        st.session_state.translation_count = 0
     # -----------------------------
     
     st.markdown("## 💡 Code Explanation")
