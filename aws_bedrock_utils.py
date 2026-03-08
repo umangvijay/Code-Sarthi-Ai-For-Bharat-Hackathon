@@ -33,7 +33,8 @@ class BedrockClient:
         # self.model_id = "amazon.titan-text-express-v1"  # Previous: Titan Text Express
         # self.model_id = "google.gemma-3-12b-it-v1:0"  # Previous: Google Gemma 3 12B (AWS event requirement)
         # self.model_id = "amazon.nova-micro-v1:0"  # Previous: Nova Micro (global)
-        self.model_id = "us.amazon.nova-micro-v1:0"  # Current: Nova Micro regional for us-west-2 (fastest for hackathons)
+        # self.model_id = "us.amazon.nova-micro-v1:0"  # Previous: Nova Micro regional for us-west-2
+        self.model_id = "us.amazon.nova-pro-v1:0"  # Current: Nova Pro regional for us-west-2 (better quality)
         
         if self.use_aws:
             # Use IAM roles via boto3.Session() for security
