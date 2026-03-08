@@ -83,8 +83,6 @@ class RAGEngine:
         
         # Ensure initialization never fails
         try:
-        # Ensure initialization never fails
-        try:
             # Initialize AWS Bedrock client for embeddings (if AWS enabled)
             if self.use_aws:
                 try:
