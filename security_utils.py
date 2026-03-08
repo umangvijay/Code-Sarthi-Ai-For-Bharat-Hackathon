@@ -461,7 +461,7 @@ def generate_iam_policy_document() -> Dict[str, any]:
         'Sid': 'BedrockAIModels',
         'Effect': 'Allow',
         'Action': permissions['bedrock'],
-        'Resource': 'arn:aws:bedrock:*::foundation-model/anthropic.claude-3-5-sonnet-20240620-v1:0'
+        'Resource': 'arn:aws:bedrock:*::foundation-model/us.amazon.nova-lite-v1:0'
     })
     
     # Kendra permissions

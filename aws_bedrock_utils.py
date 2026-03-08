@@ -19,7 +19,7 @@ USE_AWS = os.getenv("USE_AWS", "False") == "True"
 class BedrockClient:
     """Client for interacting with Amazon Bedrock (Claude 3.5 Sonnet) with Hybrid Mode support"""
     
-    def __init__(self, region_name: str = "ap-northeast-1"):
+    def __init__(self, region_name: str = "us-east-1"):
         """
         Initialize Bedrock client with Hybrid Mode support
         
@@ -34,7 +34,8 @@ class BedrockClient:
         # self.model_id = "google.gemma-3-12b-it-v1:0"  # Previous: Google Gemma 3 12B (AWS event requirement)
         # self.model_id = "amazon.nova-micro-v1:0"  # Previous: Nova Micro in ap-northeast-3
         # self.model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Raw model ID (doesn't support on-demand)
-        self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"  # Current: Cross-region inference profile in ap-northeast-1 (Tokyo)
+        # self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Claude inference profile
+        self.model_id = "us.amazon.nova-lite-v1:0"  # Current: Nova Lite cross-region inference profile in us-east-1
         
         if self.use_aws:
             # Use IAM roles via boto3.Session() for security
