@@ -1,0 +1,337 @@
+# Code-Sarthi .gitignore
+# AWS AI for Bharat Hackathon - Secure Repository Configuration
+
+################################################################################
+# CRITICAL SECURITY - DO NOT COMMIT THESE FILES
+################################################################################
+
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+.env.*.local
+*.env
+
+# AWS credentials and keys
+*.pem
+*.key
+*.ppk
+aws_credentials.json
+credentials.json
+
+# API keys and secrets
+secrets.json
+config.json
+.secrets/
+
+################################################################################
+# Python
+################################################################################
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.virtualenv/
+virtualenv/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+################################################################################
+# Streamlit
+################################################################################
+
+.streamlit/secrets.toml
+.streamlit/credentials.toml
+
+################################################################################
+# IDEs and Editors
+################################################################################
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+################################################################################
+# Operating System
+################################################################################
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# Linux
+*~
+.directory
+.Trash-*
+
+################################################################################
+# Project Specific
+################################################################################
+
+# Backup files
+app_corrupted_backup.py
+*_backup.py
+*.backup
+*.bak
+*.old
+
+# Temporary files
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Data files (if containing sensitive information)
+*.csv
+*.xlsx
+*.json
+data/
+uploads/
+
+# PDF metadata
+pdf_metadata.json
+
+# Cache
+.cache/
+*.cache
+
+# AWS specific
+.aws/
+aws-exports.js
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Node modules (if any frontend tooling)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+################################################################################
+# Documentation Build Artifacts
+################################################################################
+
+# Sphinx
+_build/
+_static/
+_templates/
+
+################################################################################
+# Testing
+################################################################################
+
+# pytest
+.pytest_cache/
+test-results/
+test-reports/
+
+# Coverage
+.coverage
+htmlcov/
+coverage.xml
+
+################################################################################
+# Deployment
+################################################################################
+
+# Deployment artifacts
+deploy/
+deployment/
+*.zip
+*.tar.gz
+
+# SSL certificates
+*.crt
+*.cer
+*.der
+*.p12
+*.pfx
+
+################################################################################
+# Kiro Specs (Optional - Keep or Remove Based on Preference)
+################################################################################
+
+# Uncomment if you don't want to commit Kiro specs
+# .kiro/
+
+################################################################################
+# END OF .gitignore
+################################################################################
