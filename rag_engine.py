@@ -8,19 +8,6 @@ This module implements the RAG (Retrieval-Augmented Generation) pipeline:
 3. Titan Embeddings: Uses Amazon Titan Embeddings via Bedrock for vector generation
 4. Metadata management: Tracks documents and chunks in local JSON
 5. Context retrieval: Queries FAISS for relevant content using semantic search
-
-Requirements Implemented:
-- Requirement 1.2: Chunk content into semantic segments of 500-1000 tokens
-- Requirement 1.3: Generate embeddings and store in FAISS within 30 seconds
-- Requirement 9.1: Retrieve top 5 most relevant document chunks
-- Requirement 9.4: Filter by relevance score threshold (0.7)
-
-Key Features:
-- Smart chunking with sentence boundary preservation
-- Progress tracking for Streamlit integration
-- Local metadata storage for document management
-- Semantic search with relevance scoring using FAISS + Titan Embeddings
-- Cost-optimized: No Kendra charges, only Bedrock Titan Embeddings API calls
 """
 
 import json
@@ -168,12 +155,6 @@ class RAGEngine:
         """
         Split text into semantic chunks of 500-1000 tokens
         
-        Implements smart chunking that:
-        - Maintains 500-1000 token size (target: 800 tokens)
-        - Preserves sentence boundaries
-        - Includes 100-token overlap between chunks
-        - Preserves code blocks and diagrams as single chunks
-        
         Args:
             text: Extracted PDF text to chunk
             chunk_size: Target chunk size in tokens (default: 800)
@@ -181,8 +162,6 @@ class RAGEngine:
             
         Returns:
             List of chunk dictionaries with content and metadata
-            
-        Validates: Requirements 1.2 (chunking 500-1000 tokens)
         """
         if not text or not text.strip():
             return []
@@ -246,6 +225,7 @@ class RAGEngine:
                 })
         
         return chunks
+
     
     def index_document(
         self,
@@ -257,13 +237,6 @@ class RAGEngine:
     ) -> Dict[str, any]:
         """
         Index a document in local FAISS vector store with Titan Embeddings
-        
-        Process:
-        1. Chunk the text (500-1000 tokens)
-        2. Generate embeddings using Amazon Titan
-        3. Index chunks in FAISS
-        4. Store metadata locally in JSON
-        5. Report progress via callback
         
         Args:
             document_id: Unique document identifier
@@ -394,8 +367,6 @@ class RAGEngine:
                     continue
                 
                 # Convert L2 distance to similarity score (0-1 range)
-                # Lower distance = higher similarity
-                # Use exponential decay: score = exp(-distance)
                 similarity_score = float(np.exp(-distance / 10))
                 
                 # Filter by threshold
@@ -419,12 +390,6 @@ class RAGEngine:
         """
         Heuristic function to determine if RAG should be used for a query
         
-        This optimization reduces Kendra API costs by only querying when necessary.
-        RAG is used when the query contains keywords related to:
-        - Lab assignments and manuals
-        - Specific explanations requiring context
-        - Documentation references
-        
         Args:
             query: User query text
             
@@ -435,21 +400,12 @@ class RAGEngine:
         
         # Keywords that indicate RAG would be helpful
         rag_keywords = [
-            # Lab-related
             'lab', 'assignment', 'manual', 'syllabus', 'experiment',
-            'practical', 'exercise', 'tutorial',
-            
-            # Explanation-related
-            'explain', 'what is', 'how does', 'why', 'describe',
-            'definition', 'meaning', 'purpose',
-            
-            # Documentation-related
-            'documentation', 'reference', 'example', 'guide',
-            'specification', 'requirement',
-            
-            # Context-specific
-            'according to', 'based on', 'from the', 'in the manual',
-            'lecture', 'notes', 'chapter', 'section'
+            'practical', 'exercise', 'tutorial', 'explain', 'what is',
+            'how does', 'why', 'describe', 'definition', 'meaning',
+            'purpose', 'documentation', 'reference', 'example', 'guide',
+            'specification', 'requirement', 'according to', 'based on',
+            'from the', 'in the manual', 'lecture', 'notes', 'chapter', 'section'
         ]
         
         # Check if any keyword is present
@@ -462,34 +418,21 @@ class RAGEngine:
         if word_count < 5:
             return False
         
-        # If query contains code (has programming syntax), might not need RAG
+        # If query contains code, might not need RAG
         code_indicators = ['def ', 'class ', 'function ', 'import ', 'for(', 'while(', '{', '}']
         has_code = any(indicator in query for indicator in code_indicators)
         if has_code and word_count < 10:
             return False
         
-        # Default: use RAG for longer, descriptive queries
+        # Default: use RAG for longer queries
         return word_count >= 10
     
     def get_document_metadata(self, document_id: str) -> Optional[Dict[str, any]]:
-        """
-        Get metadata for a specific document
-        
-        Args:
-            document_id: Document identifier
-            
-        Returns:
-            Document metadata dictionary or None
-        """
+        """Get metadata for a specific document"""
         return self.metadata.get('documents', {}).get(document_id)
     
     def list_documents(self) -> List[Dict[str, any]]:
-        """
-        List all indexed documents
-        
-        Returns:
-            List of document metadata dictionaries
-        """
+        """List all indexed documents"""
         return list(self.metadata.get('documents', {}).values())
     
     def delete_document(self, document_id: str) -> bool:
@@ -538,33 +481,20 @@ class RAGEngine:
     
     def _split_into_sentences(self, text: str) -> List[str]:
         """Split text into sentences preserving boundaries"""
-        # Simple sentence splitting (can be improved with NLTK)
         sentences = re.split(r'(?<=[.!?])\s+', text)
         return [s.strip() for s in sentences if s.strip()]
     
     def _count_tokens(self, text: str) -> int:
-        """
-        Count tokens accurately using tiktoken or fallback to approximation
-        
-        Args:
-            text: Text to count tokens for
-            
-        Returns:
-            Token count
-        """
+        """Count tokens accurately using tiktoken or fallback to approximation"""
         if self.tokenizer:
-            # Use tiktoken for accurate counting
             return len(self.tokenizer.encode(text))
         else:
-            # Fallback: approximation (1 token ≈ 4 characters)
             return len(text) // 4
     
     def _get_overlap_text(self, text: str, overlap_tokens: int) -> str:
         """Get last N tokens of text for overlap"""
-        overlap_chars = overlap_tokens * 4  # Approximate
+        overlap_chars = overlap_tokens * 4
         return text[-overlap_chars:] if len(text) > overlap_chars else text
-    
-
     
     def _store_metadata_locally(
         self,
@@ -607,8 +537,6 @@ class RAGEngine:
                 json.dump(self.metadata, f, indent=2, ensure_ascii=False)
         except Exception as e:
             print(f"Error saving metadata: {str(e)}")
-    
-
 
 
 # Convenience function for testing
@@ -621,7 +549,7 @@ def test_rag_engine():
     Python is a high-level programming language. It is widely used for web development.
     Python supports multiple programming paradigms. Object-oriented programming is one of them.
     Functions in Python are defined using the def keyword. Variables can store different types of data.
-    """ * 50  # Repeat to get enough text for chunking
+    """ * 50
     
     print("Testing RAG Engine...")
     print(f"Test text length: {len(test_text)} characters")
@@ -630,7 +558,7 @@ def test_rag_engine():
     chunks = engine.chunk_text(test_text)
     print(f"\nGenerated {len(chunks)} chunks")
     
-    for i, chunk in enumerate(chunks[:3]):  # Show first 3 chunks
+    for i, chunk in enumerate(chunks[:3]):
         print(f"\nChunk {i}:")
         print(f"  Token count: {chunk['token_count']}")
         print(f"  Content preview: {chunk['content'][:100]}...")
