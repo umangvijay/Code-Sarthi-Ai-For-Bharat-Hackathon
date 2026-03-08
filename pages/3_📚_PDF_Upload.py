@@ -43,9 +43,9 @@ def render():
     """PDF upload and processing page with RAG integration"""
     # --- SAFETY INITIALIZATION ---
     if "analytics" not in st.session_state:
-        # Import analytics class
-        from monitoring_analytics import Analytics
-        st.session_state.analytics = Analytics()
+        # Import analytics class (correct class name is UsageAnalytics)
+        from monitoring_analytics import UsageAnalytics
+        st.session_state.analytics = UsageAnalytics()
     
     if "pdf_count" not in st.session_state:
         st.session_state.pdf_count = 0

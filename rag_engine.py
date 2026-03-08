@@ -129,6 +129,7 @@ class RAGEngine:
         
         try:
             # Call Amazon Titan Embeddings V1 model
+            # Model ID verified for us-west-2 region
             response = self.bedrock_client.invoke_model(
                 modelId='amazon.titan-embed-text-v1',
                 body=json.dumps({
