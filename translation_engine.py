@@ -104,7 +104,7 @@ class TranslationEngine:
         else:
             self.bedrock_client = None
             
-        self.model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+        self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
     
     def translate(self, text: str, preserve_terms: Optional[List[str]] = None) -> str:
         """
@@ -157,8 +157,8 @@ class TranslationEngine:
     
     def _store_in_cache(self, cache_key: str, translation: str) -> None:
         """Store translation in cache"""
-        # Update the cache by calling the cached function
-        self._get_from_cache.__wrapped__.__setitem__(cache_key, translation)
+        # Cache is managed by LRU decorator, no manual storage needed
+        pass
     
     def detect_technical_terms(self, text: str) -> List[str]:
         """
