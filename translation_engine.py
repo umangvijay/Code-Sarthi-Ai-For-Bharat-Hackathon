@@ -37,7 +37,6 @@ import json
 import boto3
 import os
 import hashlib
-from functools import lru_cache
 from typing import List, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import ClientError
@@ -105,6 +104,9 @@ class TranslationEngine:
             self.bedrock_client = None
             
         self.model_id = "us.anthropic.claude-3-haiku-20240307-v1:0"
+        
+        # Simple dictionary cache instead of LRU cache
+        self._translation_cache = {}
     
     def translate(self, text: str, preserve_terms: Optional[List[str]] = None) -> str:
         """
@@ -149,16 +151,19 @@ class TranslationEngine:
         """Generate a hash key for caching"""
         return hashlib.md5(text.encode('utf-8')).hexdigest()
     
-    @lru_cache(maxsize=128)
     def _get_from_cache(self, cache_key: str) -> Optional[str]:
-        """Get translation from LRU cache"""
-        # LRU cache is handled by decorator
-        return None
+        """Get translation from simple dictionary cache"""
+        return self._translation_cache.get(cache_key)
     
     def _store_in_cache(self, cache_key: str, translation: str) -> None:
-        """Store translation in cache"""
-        # Cache is managed by LRU decorator, no manual storage needed
-        pass
+        """Store translation in simple dictionary cache"""
+        # Limit cache size to prevent memory issues
+        if len(self._translation_cache) > 100:
+            # Remove oldest entry (first key)
+            first_key = next(iter(self._translation_cache))
+            del self._translation_cache[first_key]
+        
+        self._translation_cache[cache_key] = translation
     
     def detect_technical_terms(self, text: str) -> List[str]:
         """
