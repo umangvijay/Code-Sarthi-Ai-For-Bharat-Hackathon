@@ -83,7 +83,7 @@ class RAGEngine:
             # Initialize FAISS index (in-memory vector store)
             self.faiss_index = None
             self.chunk_store = []  # Store chunks with metadata
-            self.embedding_dimension = 1536  # Titan Embeddings dimension
+            self.embedding_dimension = 1024  # Titan Embeddings V2 dimension
             
             # Initialize tiktoken encoder if available
             if TIKTOKEN_AVAILABLE:
@@ -109,7 +109,7 @@ class RAGEngine:
             self.bedrock_client = None
             self.faiss_index = None
             self.chunk_store = []
-            self.embedding_dimension = 1536
+            self.embedding_dimension = 1024
             self.tokenizer = None
             self.metadata = {'documents': {}}
     
@@ -128,9 +128,9 @@ class RAGEngine:
             return np.random.rand(self.embedding_dimension).astype('float32')
         
         try:
-            # Call Amazon Titan Embeddings model
+            # Call Amazon Titan Embeddings V2 model
             response = self.bedrock_client.invoke_model(
-                modelId='amazon.titan-embed-text-v1',
+                modelId='amazon.titan-embed-text-v2:0',
                 body=json.dumps({
                     "inputText": text
                 })
