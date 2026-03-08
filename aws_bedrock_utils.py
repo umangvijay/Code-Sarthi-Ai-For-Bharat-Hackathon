@@ -31,8 +31,8 @@ class BedrockClient:
         # Model ID for code explanation
         # self.model_id = "amazon.nova-lite-v1:0"  # Previous: Nova Lite (commented out due to throttling)
         # self.model_id = "amazon.titan-text-express-v1"  # Previous: Titan Text Express
-        # self.model_id = "amazon.nova-micro-v1:0"  # Previous: Nova Micro (lowest token, best for throttling)
-        self.model_id = "google.gemma-3-12b-it-v1:0"  # Current: Google Gemma 3 12B (AWS event requirement)
+        # self.model_id = "google.gemma-3-12b-it-v1:0"  # Previous: Google Gemma 3 12B (AWS event requirement)
+        self.model_id = "amazon.nova-micro-v1:0"  # Current: Nova Micro (fastest and most reliable for hackathons)
         
         if self.use_aws:
             # Use IAM roles via boto3.Session() for security
