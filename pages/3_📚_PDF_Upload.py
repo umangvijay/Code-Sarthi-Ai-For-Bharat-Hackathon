@@ -41,6 +41,10 @@ def extract_text_from_pdf(pdf_file) -> str:
 
 def render():
     """PDF upload and processing page with RAG integration"""
+    # ADD THESE TWO LINES RIGHT HERE:
+    if 'pdf_count' not in st.session_state:
+        st.session_state.pdf_count = 0
+    
     st.markdown("## 📚 PDF Upload & Processing")
     st.markdown("Upload your lab manuals, documentation, or study materials for intelligent text extraction and analysis.")
     
