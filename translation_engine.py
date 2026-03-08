@@ -81,7 +81,7 @@ class TranslationEngine:
         'git', 'commit', 'push', 'pull', 'merge', 'branch'
     }
     
-    def __init__(self, bedrock_client=None, region_name: str = "ap-northeast-3"):
+    def __init__(self, bedrock_client=None, region_name: str = "ap-northeast-1"):
         """
         Initialize Translation Engine with Hybrid Mode support
         
@@ -107,10 +107,8 @@ class TranslationEngine:
         # self.model_id = "amazon.nova-lite-v1:0"  # Previous: Nova Lite (commented out due to throttling)
         # self.model_id = "amazon.titan-text-express-v1"  # Previous: Titan Text Express
         # self.model_id = "google.gemma-3-12b-it-v1:0"  # Previous: Google Gemma 3 12B (AWS event requirement)
-        # self.model_id = "amazon.nova-micro-v1:0"  # Previous: Nova Micro (global)
-        # self.model_id = "us.amazon.nova-micro-v1:0"  # Previous: Nova Micro regional for us-west-2
-        # self.model_id = "us.amazon.nova-pro-v1:0"  # Previous: Nova Pro regional for us-west-2 (throttled)
-        self.model_id = "amazon.nova-micro-v1:0"  # Current: Nova Micro in ap-northeast-3 (Osaka) to avoid throttling
+        # self.model_id = "amazon.nova-micro-v1:0"  # Previous: Nova Micro in ap-northeast-3
+        self.model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"  # Current: Claude 3.5 Sonnet v2 in ap-northeast-3 (Osaka)
         
         # Simple dictionary cache instead of LRU cache
         self._translation_cache = {}
