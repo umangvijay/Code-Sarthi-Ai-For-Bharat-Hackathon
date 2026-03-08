@@ -104,7 +104,7 @@ class TranslationEngine:
         else:
             self.bedrock_client = None
             
-        self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+        self.model_id = "us.anthropic.claude-3-haiku-20240307-v1:0"
     
     def translate(self, text: str, preserve_terms: Optional[List[str]] = None) -> str:
         """

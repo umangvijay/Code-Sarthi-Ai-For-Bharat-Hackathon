@@ -10,6 +10,9 @@ from botocore.exceptions import ClientError, NoCredentialsError
 # Hybrid Mode Configuration
 USE_AWS = os.getenv("USE_AWS", "False") == "True"
 
+# S3 Bucket Configuration
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "code-sarthi-pdfs")  # Change this to your bucket name
+
 
 class AWSConfig:
     """Manages AWS configuration and validates credentials"""

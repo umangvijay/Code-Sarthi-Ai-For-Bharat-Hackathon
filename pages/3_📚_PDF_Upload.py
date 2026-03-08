@@ -104,8 +104,13 @@ def render():
                     
                     st.session_state.pdf_count += 1
                 
-                # Chunk the text
+                # Chunk the text with safety check
                 with st.spinner("✂️ Chunking text for analysis..."):
+                    # Safety check: Ensure rag_engine is initialized
+                    if st.session_state.rag_engine is None:
+                        st.error('❌ RAG Engine not initialized. Please refresh the page.')
+                        return
+                    
                     with ResponseTimeTracker(st.session_state.analytics, "pdf_processing"):
                         chunks = st.session_state.rag_engine.chunk_text(extracted_text)
                 
