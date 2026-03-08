@@ -28,7 +28,10 @@ class BedrockClient:
         """
         self.use_aws = USE_AWS
         self.region_name = region_name
-        self.model_id = "amazon.nova-lite-v1:0"
+        # Model ID for code explanation
+        # self.model_id = "amazon.nova-lite-v1:0"  # Previous: Nova Lite (commented out due to throttling)
+        # self.model_id = "amazon.titan-text-express-v1"  # Previous: Titan Text Express
+        self.model_id = "amazon.nova-micro-v1:0"  # Current: Nova Micro (lowest token, best for throttling)
         
         if self.use_aws:
             # Use IAM roles via boto3.Session() for security

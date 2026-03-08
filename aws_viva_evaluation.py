@@ -54,7 +54,10 @@ class VivaAnswerEvaluator:
             service_name='bedrock-runtime',
             region_name=region_name
         )
-        self.model_id = "amazon.nova-lite-v1:0"
+        # Model ID for viva evaluation
+        # self.model_id = "amazon.nova-lite-v1:0"  # Previous: Nova Lite (commented out due to throttling)
+        # self.model_id = "amazon.titan-text-express-v1"  # Previous: Titan Text Express
+        self.model_id = "amazon.nova-micro-v1:0"  # Current: Nova Micro (lowest token, best for throttling)
     
     def evaluate_answer(
         self,
