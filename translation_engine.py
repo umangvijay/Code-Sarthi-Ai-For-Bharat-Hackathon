@@ -110,7 +110,8 @@ class TranslationEngine:
         # self.model_id = "amazon.nova-micro-v1:0"  # Previous: Nova Micro in ap-northeast-3
         # self.model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Raw model ID (doesn't support on-demand)
         # self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Claude inference profile in ap-northeast-1
-        self.model_id = "us.amazon.nova-lite-v1:0"  # Current: Nova Lite global cross-region inference profile in us-east-1
+        # self.model_id = "us.amazon.nova-lite-v1:0"  # Previous: Nova Lite cross-region inference profile
+        self.model_id = "amazon.nova-2-lite-v1:0"  # Current: Nova 2 Lite in us-east-1
         
         # Simple dictionary cache instead of LRU cache
         self._translation_cache = {}
