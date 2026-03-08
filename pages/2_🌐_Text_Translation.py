@@ -26,6 +26,12 @@ def _record_history(kind: str, user_text: str, output_text: str) -> None:
 
 def render():
     """Enhanced text translation page"""
+    # --- SAFETY INITIALIZATION ---
+    if "translation_engine" not in st.session_state:
+        from translation_engine import TranslationEngine
+        st.session_state.translation_engine = TranslationEngine()
+    # -----------------------------
+    
     st.markdown("## 🌐 Text Translation")
     st.markdown("Convert technical English content to natural Hinglish while preserving accuracy.")
     
