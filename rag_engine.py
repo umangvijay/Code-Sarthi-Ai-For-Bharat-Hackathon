@@ -63,7 +63,8 @@ class RAGEngine:
         kendra_index_id: Optional[str] = None,
         region_name: str = "us-east-1",
         metadata_file: str = "pdf_metadata.json",
-        use_aws: bool = True
+        use_aws: bool = True,
+        s3_bucket_name: str = "code-sarthi-pdfs-umang"
     ):
         """
         Initialize RAG Engine with FAISS + Titan Embeddings
@@ -73,43 +74,59 @@ class RAGEngine:
             region_name: AWS region for Bedrock
             metadata_file: Path to local JSON file for metadata storage
             use_aws: Whether to use AWS services (from USE_AWS env var)
+            s3_bucket_name: S3 bucket name for document storage
         """
         self.region_name = region_name
         self.metadata_file = metadata_file
         self.use_aws = use_aws
+        self.s3_bucket_name = s3_bucket_name
         
-        # Initialize AWS Bedrock client for embeddings (if AWS enabled)
-        if self.use_aws:
-            try:
-                self.bedrock_client = boto3.client('bedrock-runtime', region_name=region_name)
-            except Exception as e:
-                print(f"Warning: Could not initialize Bedrock client: {e}")
+        # Ensure initialization never fails
+        try:
+        # Ensure initialization never fails
+        try:
+            # Initialize AWS Bedrock client for embeddings (if AWS enabled)
+            if self.use_aws:
+                try:
+                    self.bedrock_client = boto3.client('bedrock-runtime', region_name=region_name)
+                except Exception as e:
+                    print(f"Warning: Could not initialize Bedrock client: {e}")
+                    self.bedrock_client = None
+            else:
                 self.bedrock_client = None
-        else:
-            self.bedrock_client = None
-        
-        # Initialize FAISS index (in-memory vector store)
-        self.faiss_index = None
-        self.chunk_store = []  # Store chunks with metadata
-        self.embedding_dimension = 1536  # Titan Embeddings dimension
-        
-        # Initialize tiktoken encoder if available
-        if TIKTOKEN_AVAILABLE:
-            try:
-                self.tokenizer = tiktoken.get_encoding("cl100k_base")  # GPT-4/Claude encoding
-            except Exception:
+            
+            # Initialize FAISS index (in-memory vector store)
+            self.faiss_index = None
+            self.chunk_store = []  # Store chunks with metadata
+            self.embedding_dimension = 1536  # Titan Embeddings dimension
+            
+            # Initialize tiktoken encoder if available
+            if TIKTOKEN_AVAILABLE:
+                try:
+                    self.tokenizer = tiktoken.get_encoding("cl100k_base")  # GPT-4/Claude encoding
+                except Exception:
+                    self.tokenizer = None
+            else:
                 self.tokenizer = None
-        else:
+            
+            # Load or initialize metadata
+            self.metadata = self._load_metadata()
+            
+            # Initialize FAISS index if available
+            if FAISS_AVAILABLE:
+                self.faiss_index = faiss.IndexFlatL2(self.embedding_dimension)
+            else:
+                print("Warning: FAISS not available. Install faiss-cpu for vector search.")
+                
+        except Exception as e:
+            # If anything fails, ensure object is still usable
+            print(f"Warning: RAG Engine initialization had errors: {e}")
+            self.bedrock_client = None
+            self.faiss_index = None
+            self.chunk_store = []
+            self.embedding_dimension = 1536
             self.tokenizer = None
-        
-        # Load or initialize metadata
-        self.metadata = self._load_metadata()
-        
-        # Initialize FAISS index if available
-        if FAISS_AVAILABLE:
-            self.faiss_index = faiss.IndexFlatL2(self.embedding_dimension)
-        else:
-            print("Warning: FAISS not available. Install faiss-cpu for vector search.")
+            self.metadata = {'documents': {}}
     
     def _get_embedding(self, text: str) -> Optional[np.ndarray]:
         """

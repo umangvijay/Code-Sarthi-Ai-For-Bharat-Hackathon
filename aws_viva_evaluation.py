@@ -54,7 +54,7 @@ class VivaAnswerEvaluator:
             service_name='bedrock-runtime',
             region_name=region_name
         )
-        self.model_id = "us.anthropic.claude-3-haiku-20240307-v1:0"
+        self.model_id = "amazon.nova-lite-v1:0"
     
     def evaluate_answer(
         self,

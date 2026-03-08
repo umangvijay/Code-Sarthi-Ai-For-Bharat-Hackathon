@@ -103,7 +103,7 @@ class TranslationEngine:
         else:
             self.bedrock_client = None
             
-        self.model_id = "us.anthropic.claude-3-haiku-20240307-v1:0"
+        self.model_id = "amazon.nova-lite-v1:0"
         
         # Simple dictionary cache instead of LRU cache
         self._translation_cache = {}

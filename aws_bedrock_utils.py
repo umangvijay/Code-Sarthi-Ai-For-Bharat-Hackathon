@@ -28,7 +28,7 @@ class BedrockClient:
         """
         self.use_aws = USE_AWS
         self.region_name = region_name
-        self.model_id = "us.anthropic.claude-3-haiku-20240307-v1:0"
+        self.model_id = "amazon.nova-lite-v1:0"
         
         if self.use_aws:
             # Use IAM roles via boto3.Session() for security
