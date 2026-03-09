@@ -30,8 +30,71 @@ st.set_page_config(
     page_title="Code-Sarthi - Hinglish Code Assistant",
     page_icon="🎓",
     layout="wide",
-    initial_sidebar_state="auto",
+    initial_sidebar_state="expanded",
 )
+
+# CRITICAL: Force sidebar toggle button to be visible - failsafe CSS
+st.markdown("""
+<style>
+    /* Make header background transparent but keep container visible */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        background-color: transparent !important;
+        backdrop-filter: none !important;
+    }
+    
+    /* Hide ONLY the Deploy button and status widget */
+    div[data-testid="stStatusWidget"] {
+        display: none !important;
+    }
+    
+    button[data-testid="stDeployButton"] {
+        display: none !important;
+    }
+    
+    /* Force sidebar toggle to ALWAYS be visible - theme-agnostic styling */
+    button[kind="header"],
+    button[data-testid="baseButton-header"],
+    div[data-testid="collapsedControl"] {
+        display: inline-flex !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 999999 !important;
+        color: #FF4B4B !important;
+        background-color: rgba(128, 128, 128, 0.15) !important;
+        border: 2px solid rgba(255, 75, 75, 0.5) !important;
+        border-radius: 50% !important;
+        padding: 0.5rem !important;
+        width: 2.5rem !important;
+        height: 2.5rem !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    /* Make the arrow icon itself high-contrast orange */
+    button[kind="header"] svg,
+    button[data-testid="baseButton-header"] svg,
+    div[data-testid="collapsedControl"] svg {
+        fill: #FF4B4B !important;
+        color: #FF4B4B !important;
+        stroke: #FF4B4B !important;
+    }
+    
+    /* Hover effect for better interactivity */
+    button[kind="header"]:hover,
+    button[data-testid="baseButton-header"]:hover {
+        background-color: rgba(255, 75, 75, 0.25) !important;
+        border-color: rgba(255, 75, 75, 0.8) !important;
+        transform: scale(1.05) !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    /* Reduce top padding */
+    .block-container {
+        padding-top: 1rem !important;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 
 @st.cache_resource

@@ -264,15 +264,14 @@ class TranslationEngine:
         Returns:
             Translated text with natural Hindi phrasing
         """
-        # Check AWS mode and readiness
-        if self.use_aws and is_aws_ready():
-            print("🟢 AWS Mode: Using Bedrock translation")
-        else:
-            if self.use_aws and not is_aws_ready():
-                print("🔴 AWS not ready, falling back to Local Mode")
-            else:
-                print("🔵 Local Mode: Translation simulation")
-            return f"🔵 Local Mode: Translation simulation\n\n{text}\n\n(Enable AWS mode for full Hinglish translation)"
+        # FORCE AWS mode - no simulation fallback
+        if not self.use_aws:
+            return f"⚠️ AWS mode is disabled. Set USE_AWS=true to enable translations."
+        
+        if not is_aws_ready():
+            return f"⚠️ AWS services not ready. Please check your AWS configuration."
+        
+        print("🟢 AWS Mode: Using Bedrock translation")
         
         # Build the translation prompt
         prompt = self._build_translation_prompt(text, terms)

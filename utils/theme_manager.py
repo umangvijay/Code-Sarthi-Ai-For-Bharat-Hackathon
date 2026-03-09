@@ -85,7 +85,6 @@ class ThemeManager:
     
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
-    header {{visibility: hidden;}}
     
     html, body, [class*="css"] {{
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -118,30 +117,12 @@ class ThemeManager:
         }}
     }}
     
-    /* Handle sidebar collapsed state */
-    section[data-testid="stSidebar"][aria-expanded="false"] {{
-        width: 0 !important;
-        min-width: 0 !important;
-    }}
-    
     /* Ensure content container adjusts properly */
     .main .block-container {{
         max-width: 100%;
         padding-left: 2rem;
         padding-right: 2rem;
         transition: all 300ms ease-in-out;
-    }}
-    
-    /* Fix for the collapse button positioning */
-    [data-testid="collapsedControl"] {{
-        position: fixed !important;
-        left: 0 !important;
-        top: 0 !important;
-        z-index: 999999 !important;
-        background-color: {colors['sidebar']} !important;
-        border-right: 1px solid {colors['border']} !important;
-        padding: 0.5rem !important;
-        border-radius: 0 8px 8px 0 !important;
     }}
     
     @keyframes fadeInUp {{
