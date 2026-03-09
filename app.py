@@ -30,7 +30,7 @@ st.set_page_config(
     page_title="Code-Sarthi - Hinglish Code Assistant",
     page_icon="🎓",
     layout="wide",
-    initial_sidebar_state="collapsed",  # Start collapsed to respect user preference
+    initial_sidebar_state="auto",
 )
 
 

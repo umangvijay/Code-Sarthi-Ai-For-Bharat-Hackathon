@@ -4,7 +4,6 @@ Manages application theme state and CSS injection for Light/Dark/System modes
 """
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 
 class ThemeManager:
@@ -52,30 +51,11 @@ class ThemeManager:
     
     def detect_system_theme(self) -> str:
         """
-        Detect operating system theme preference using JavaScript
-        Returns 'light' or 'dark' based on OS preference
+        Detect operating system theme preference
+        Returns 'light' or 'dark' based on stored preference
+        Note: System theme detection via JavaScript has been simplified to avoid rendering issues
         """
-        js_code = """
-        <script>
-        const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const systemTheme = darkModeQuery.matches ? 'dark' : 'light';
-        
-        window.parent.postMessage({
-            type: 'streamlit:setComponentValue',
-            value: systemTheme
-        }, '*');
-        
-        darkModeQuery.addEventListener('change', (e) => {
-            const newTheme = e.matches ? 'dark' : 'light';
-            window.parent.postMessage({
-                type: 'streamlit:setComponentValue',
-                value: newTheme
-            }, '*');
-        });
-        </script>
-        """
-        
-        components.html(js_code, height=0)
+        # Default to light theme if not detected
         return st.session_state.get('detected_system_theme', 'light')
     
     def get_current_theme(self) -> str:
@@ -138,30 +118,10 @@ class ThemeManager:
         }}
     }}
     
-    /* CRITICAL: Handle sidebar collapsed state with comprehensive selectors */
-    /* Target the main content area when sidebar is collapsed */
-    section[data-testid="stSidebar"][aria-expanded="false"] ~ div > div > div > div > section.main,
-    section[data-testid="stSidebar"][aria-expanded="false"] ~ * section.main,
-    div:has(> section[data-testid="stSidebar"][aria-expanded="false"]) section.main {{
-        margin-left: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        padding-left: 3rem !important;
-        padding-right: 3rem !important;
-    }}
-    
-    /* Ensure the app view container expands when sidebar is collapsed */
-    div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="false"]) {{
-        margin-left: 0 !important;
-        width: 100% !important;
-    }}
-    
-    /* Force the sidebar to take no space when collapsed */
+    /* Handle sidebar collapsed state */
     section[data-testid="stSidebar"][aria-expanded="false"] {{
         width: 0 !important;
         min-width: 0 !important;
-        margin-left: -100% !important;
-        transform: translateX(-100%) !important;
     }}
     
     /* Ensure content container adjusts properly */
@@ -170,13 +130,6 @@ class ThemeManager:
         padding-left: 2rem;
         padding-right: 2rem;
         transition: all 300ms ease-in-out;
-    }}
-    
-    /* When sidebar is collapsed, expand block container */
-    section[data-testid="stSidebar"][aria-expanded="false"] ~ * .block-container {{
-        max-width: 100% !important;
-        padding-left: 3rem !important;
-        padding-right: 3rem !important;
     }}
     
     /* Fix for the collapse button positioning */
@@ -189,18 +142,6 @@ class ThemeManager:
         border-right: 1px solid {colors['border']} !important;
         padding: 0.5rem !important;
         border-radius: 0 8px 8px 0 !important;
-    }}
-    
-    /* Ensure columns expand properly when sidebar is collapsed */
-    section[data-testid="stSidebar"][aria-expanded="false"] ~ * [data-testid="column"] {{
-        flex: 1 1 0 !important;
-        min-width: 0 !important;
-    }}
-    
-    /* Ensure horizontal blocks stay responsive */
-    section[data-testid="stSidebar"][aria-expanded="false"] ~ * [data-testid="stHorizontalBlock"] {{
-        width: 100% !important;
-        max-width: 100% !important;
     }}
     
     @keyframes fadeInUp {{
@@ -524,73 +465,6 @@ class ThemeManager:
         color: {colors['text_secondary']} !important;
     }}
 </style>
-
-<script>
-// Persist sidebar collapse state across Streamlit reruns
-(function() {{
-    // Check if sidebar state is stored
-    const sidebarCollapsed = sessionStorage.getItem('sidebarCollapsed');
-    
-    // Function to update sidebar state
-    function updateSidebarState() {{
-        const sidebar = document.querySelector('section[data-testid="stSidebar"]');
-        if (sidebar) {{
-            const isCollapsed = sidebar.getAttribute('aria-expanded') === 'false';
-            sessionStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
-        }}
-    }}
-    
-    // Function to apply stored sidebar state
-    function applySidebarState() {{
-        if (sidebarCollapsed === 'true') {{
-            const collapseButton = document.querySelector('[data-testid="collapsedControl"]');
-            const sidebar = document.querySelector('section[data-testid="stSidebar"]');
-            
-            // If sidebar is expanded but should be collapsed, click the collapse button
-            if (sidebar && sidebar.getAttribute('aria-expanded') !== 'false' && collapseButton) {{
-                // Small delay to ensure Streamlit has finished rendering
-                setTimeout(() => {{
-                    collapseButton.click();
-                }}, 100);
-            }}
-        }}
-    }}
-    
-    // Apply state on page load
-    if (document.readyState === 'loading') {{
-        document.addEventListener('DOMContentLoaded', applySidebarState);
-    }} else {{
-        applySidebarState();
-    }}
-    
-    // Watch for sidebar state changes
-    const observer = new MutationObserver(function(mutations) {{
-        mutations.forEach(function(mutation) {{
-            if (mutation.type === 'attributes' && mutation.attributeName === 'aria-expanded') {{
-                updateSidebarState();
-            }}
-        }});
-    }});
-    
-    // Start observing sidebar for attribute changes
-    const checkSidebar = setInterval(() => {{
-        const sidebar = document.querySelector('section[data-testid="stSidebar"]');
-        if (sidebar) {{
-            observer.observe(sidebar, {{ attributes: true }});
-            clearInterval(checkSidebar);
-        }}
-    }}, 100);
-    
-    // Also watch for collapse button clicks
-    const checkCollapseButton = setInterval(() => {{
-        const collapseButton = document.querySelector('[data-testid="collapsedControl"]');
-        if (collapseButton) {{
-            collapseButton.addEventListener('click', updateSidebarState);
-            clearInterval(checkCollapseButton);
-        }}
-    }}, 100);
-}})();
-</script>
 """
         st.markdown(css, unsafe_allow_html=True)
     
