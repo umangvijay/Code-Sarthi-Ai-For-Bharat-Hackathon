@@ -50,10 +50,11 @@ def render():
     if "pdf_count" not in st.session_state:
         st.session_state.pdf_count = 0
     
-    if "rag_engine" not in st.session_state:
-        # This prevents the "RAG Engine not initialized" error
-        from aws_config import USE_AWS
-        st.session_state.rag_engine = RAGEngine(use_aws=USE_AWS)
+    # Get RAG engine from session state (initialized in app.py)
+    rag_engine = st.session_state.get("rag_engine")
+    if rag_engine is None:
+        st.error("❌ RAG Engine not initialized. Please return to the home page.")
+        st.stop()
     # -----------------------------
     
     st.markdown("## 📚 PDF Upload & Processing")
@@ -114,15 +115,10 @@ def render():
                     
                     st.session_state.pdf_count += 1
                 
-                # Chunk the text with safety check
+                # Chunk the text using RAG engine
                 with st.spinner("✂️ Chunking text for analysis..."):
-                    # Safety check: Ensure rag_engine is initialized
-                    if st.session_state.rag_engine is None:
-                        st.error('❌ RAG Engine not initialized. Please refresh the page.')
-                        return
-                    
                     with ResponseTimeTracker(st.session_state.analytics, "pdf_processing"):
-                        chunks = st.session_state.rag_engine.chunk_text(extracted_text)
+                        chunks = rag_engine.chunk_text(extracted_text)
                 
                 # Display results
                 st.markdown("<br>", unsafe_allow_html=True)

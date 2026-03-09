@@ -49,9 +49,10 @@ def is_aws_ready():
     """Check if AWS services are ready from session state"""
     try:
         import streamlit as st
-        return st.session_state.get("aws_ready", False)
-    except:
-        # If not in Streamlit context or any error, return False
+        if "aws_ready" in st.session_state:
+            return st.session_state["aws_ready"]
+        return False
+    except Exception:
         return False
 
 

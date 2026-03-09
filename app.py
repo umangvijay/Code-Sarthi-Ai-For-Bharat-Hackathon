@@ -21,10 +21,9 @@ from monitoring_analytics import get_analytics
 from translation_engine import TranslationEngine
 from utils.theme_manager import ThemeManager
 
-# Initialize aws_ready flag early to prevent AttributeError
+# Initialize aws_ready flag IMMEDIATELY to prevent AttributeError
 if "aws_ready" not in st.session_state:
     st.session_state.aws_ready = False
-
 
 # Page configuration
 st.set_page_config(
@@ -47,7 +46,45 @@ def initialize_aws():
     """Initialize and validate AWS services (cached per session)"""
     config = initialize_aws_config()
     valid, message = config.validate_aws()
+    print(f"AWS Validation: {message}")
     return valid, message
+
+
+@st.cache_resource
+def initialize_rag():
+    """Initialize RAG engine (cached per session)"""
+    try:
+        from rag_engine import RAGEngine
+        rag = RAGEngine()
+        print("🟢 RAG Engine initialized successfully")
+        return rag
+    except Exception as e:
+        print(f"🔴 Failed to initialize RAG Engine: {e}")
+        return None
+
+
+# Run AWS validation immediately and update session state
+try:
+    valid, message = initialize_aws()
+    st.session_state.aws_ready = valid
+    if valid:
+        print("🟢 AWS services ready")
+    else:
+        print(f"🔴 AWS not ready: {message}")
+except Exception as e:
+    st.session_state.aws_ready = False
+    print(f"🔴 AWS initialization failed: {e}")
+
+
+# Initialize RAG engine immediately after AWS
+if "rag_engine" not in st.session_state:
+    try:
+        st.session_state.rag_engine = initialize_rag()
+        if st.session_state.rag_engine is None:
+            print("⚠️ RAG Engine initialization returned None")
+    except Exception as e:
+        st.session_state.rag_engine = None
+        print(f"🔴 RAG Engine initialization failed: {e}")
 
 
 def initialize_session_state() -> None:
@@ -83,32 +120,26 @@ def check_aws_services():
         return st.session_state.aws_ready, "Services already checked"
 
     try:
-        # Initialize AWS config and validate (cached)
-        valid, message = initialize_aws()
-        st.session_state.aws_ready = valid
+        # AWS validation already ran at module load
+        # Just initialize the config and translation engine
         st.session_state.aws_config = initialize_aws_config()
+        st.session_state.translation_engine = TranslationEngine()
         st.session_state.services_checked = True
         
-        if valid:
-            print("🟢 AWS services ready")
-            st.session_state.translation_engine = TranslationEngine()
+        if st.session_state.aws_ready:
             return True, "✅ All required AWS services ready"
         else:
-            print("🔴 AWS services not ready:", message)
-            # Still initialize translation engine for local mode fallback
-            st.session_state.translation_engine = TranslationEngine()
-            return False, message
+            return False, "⚠️ AWS services not available, using local mode"
             
     except Exception as exc:
         st.session_state.services_checked = True
-        st.session_state.aws_ready = False
-        print(f"🔴 AWS initialization failed: {exc}")
-        # Initialize translation engine for local mode fallback
+        print(f"🔴 Service initialization failed: {exc}")
+        # Try to initialize translation engine for local mode fallback
         try:
             st.session_state.translation_engine = TranslationEngine()
         except:
             pass
-        return False, f"AWS initialization failed: {exc}"
+        return False, f"Service initialization failed: {exc}"
 
 
 def render_sidebar() -> None:
