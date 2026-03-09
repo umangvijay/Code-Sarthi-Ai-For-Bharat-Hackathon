@@ -6,7 +6,7 @@ Supports Hybrid Mode for offline operation
 This module implements the TranslationEngine class which is responsible for:
 1. Translating technical English explanations to natural Hinglish
 2. Detecting and preserving programming keywords and technical terms
-3. Applying translation rules using Amazon Bedrock (Claude 3.5 Sonnet)
+3. Applying translation rules using Amazon Bedrock (Amazon Nova 2 Lite)
 4. Caching translations to reduce API costs and latency
 
 Requirements Implemented:
@@ -48,7 +48,7 @@ USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
 
 # Global throttling state
 LAST_BEDROCK_CALL = 0
-THROTTLE_DELAY = 1.5  # 1.5 second delay between Bedrock calls (max ~40 calls/min)
+THROTTLE_DELAY = 1.0  # 1.0 second delay between Bedrock calls
 
 # Global request lock to prevent parallel calls
 REQUEST_LOCK = threading.Lock()
@@ -312,7 +312,7 @@ class TranslationEngine:
                         }
                     ],
                     inferenceConfig={
-                        "maxTokens": 600,
+                        "maxTokens": 400,
                         "temperature": 0.3
                     }
                 )

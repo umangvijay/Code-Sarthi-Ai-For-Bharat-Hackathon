@@ -49,7 +49,7 @@ class RAGEngine:
     def __init__(
         self, 
         kendra_index_id: Optional[str] = None,
-        region_name: str = "us-east-1",
+        region_name: str = "ap-south-1",
         metadata_file: str = "pdf_metadata.json",
         use_aws: bool = True,
         s3_bucket_name: str = "code-sarthi-hackathon-data-2026"

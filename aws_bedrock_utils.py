@@ -1,6 +1,6 @@
 """
 AWS Bedrock Utilities for Code-Sarthi
-Handles AI reasoning and Hinglish translation using Claude 3.5 Sonnet
+Handles AI reasoning and Hinglish translation using Amazon Nova 2 Lite
 Supports Hybrid Mode for offline operation
 Includes retry logic for API resilience and throttling protection
 Includes response caching and request deduplication
@@ -22,7 +22,7 @@ USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
 
 # Global throttling state
 LAST_BEDROCK_CALL = 0
-THROTTLE_DELAY = 1.5  # 1.5 second delay between Bedrock calls (max ~40 calls/min)
+THROTTLE_DELAY = 1.0  # 1.0 second delay between Bedrock calls
 
 # Global request lock to prevent parallel calls
 REQUEST_LOCK = threading.Lock()
@@ -60,7 +60,7 @@ def is_aws_ready():
 
 
 class BedrockClient:
-    """Client for interacting with Amazon Bedrock (Claude 3.5 Sonnet) with Hybrid Mode support"""
+    """Client for interacting with Amazon Bedrock (Amazon Nova 2 Lite) with Hybrid Mode support"""
     
     def __init__(self, region_name: str = "ap-south-1"):
         """
@@ -183,7 +183,7 @@ class BedrockClient:
                         }
                     ],
                     inferenceConfig={
-                        "maxTokens": 600,
+                        "maxTokens": 400,
                         "temperature": 0.3
                     }
                 )

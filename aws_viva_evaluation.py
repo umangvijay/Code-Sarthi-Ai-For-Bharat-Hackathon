@@ -42,7 +42,7 @@ REQUEST_LOCK = threading.Lock()
 
 # Global throttling state
 LAST_BEDROCK_CALL = 0
-THROTTLE_DELAY = 1.5  # 1.5 second delay between Bedrock calls (max ~40 calls/min)
+THROTTLE_DELAY = 1.0  # 1.0 second delay between Bedrock calls
 
 
 def throttle_bedrock():
@@ -64,7 +64,7 @@ def get_prompt_hash(prompt: str) -> str:
 
 class VivaAnswerEvaluator:
     """
-    Evaluates viva answers using AWS Bedrock (Claude 3.5 Sonnet)
+    Evaluates viva answers using AWS Bedrock (Amazon Nova 2 Lite)
     
     Provides three-dimensional scoring:
     - Correctness: Technical accuracy of the answer
@@ -181,7 +181,7 @@ class VivaAnswerEvaluator:
                     }
                 ],
                 inferenceConfig={
-                    "maxTokens": 600,
+                    "maxTokens": 400,
                     "temperature": 0.3
                 }
             )
