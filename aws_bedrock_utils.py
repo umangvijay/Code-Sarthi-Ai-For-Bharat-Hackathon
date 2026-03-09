@@ -12,9 +12,19 @@ import os
 import time
 import hashlib
 import threading
+import logging
+from datetime import datetime
 from typing import Optional, Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import ClientError
+
+# Configure logging to file
+logging.basicConfig(
+    filename='app.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 
 # Force AWS Mode - EC2 with IAM Role
 # Set USE_AWS=False in environment to disable (for local development only)
@@ -29,6 +39,54 @@ REQUEST_LOCK = threading.Lock()
 
 # Maximum prompt length to reduce token usage
 MAX_PROMPT_LENGTH = 1500  # Reduced for Nova 2 Lite quota management
+
+# Nova 2 Lite pricing (per 1M tokens)
+NOVA_2_LITE_INPUT_PRICE = 0.35  # $0.35 per 1M input tokens
+NOVA_2_LITE_OUTPUT_PRICE = 2.95  # $2.95 per 1M output tokens
+
+
+def log_token_usage(response: dict, operation: str = "Bedrock"):
+    """
+    Extract and log token usage from Bedrock response
+    
+    Args:
+        response: Bedrock converse() response object
+        operation: Name of the operation (for logging context)
+    """
+    try:
+        # Extract usage metadata
+        usage = response.get('usage', {})
+        input_tokens = usage.get('inputTokens', 0)
+        output_tokens = usage.get('outputTokens', 0)
+        total_tokens = input_tokens + output_tokens
+        
+        # Calculate costs
+        input_cost = (input_tokens / 1_000_000) * NOVA_2_LITE_INPUT_PRICE
+        output_cost = (output_tokens / 1_000_000) * NOVA_2_LITE_OUTPUT_PRICE
+        total_cost = input_cost + output_cost
+        
+        # Print to terminal
+        print("\n📊 --- Token Usage Report ---")
+        print(f"📥 Input Tokens: {input_tokens}")
+        print(f"📤 Output Tokens: {output_tokens}")
+        print(f"💎 Total Tokens: {total_tokens}")
+        print(f"💰 Estimated Cost: ${total_cost:.6f}")
+        print("----------------------------\n")
+        
+        # Log to file
+        log_message = (
+            f"📊 {operation} Token Usage | "
+            f"Input: {input_tokens} | "
+            f"Output: {output_tokens} | "
+            f"Total: {total_tokens} | "
+            f"Cost: ${total_cost:.6f}"
+        )
+        logging.info(log_message)
+        
+    except Exception as e:
+        # Don't break the flow if logging fails
+        print(f"⚠️  Token usage logging failed: {e}")
+        logging.error(f"Token usage logging error: {e}")
 
 
 def throttle_bedrock():
@@ -190,6 +248,9 @@ class BedrockClient:
             
             # Parse response from Converse API
             explanation = response['output']['message']['content'][0]['text']
+            
+            # Log token usage and cost
+            log_token_usage(response, operation="Code Explanation")
             
             # Detect programming language
             language = self._detect_language(code_snippet)
