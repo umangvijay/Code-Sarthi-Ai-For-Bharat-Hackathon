@@ -127,6 +127,53 @@ class ThemeManager:
     .main {{
         background: {colors['gradient_bg']} !important;
         padding: 2rem;
+        max-width: 100%;
+        width: 100%;
+    }}
+    
+    /* Responsive layout for sidebar collapse */
+    @media (max-width: 768px) {{
+        .main {{
+            padding: 1rem;
+        }}
+    }}
+    
+    /* Handle sidebar collapsed state - Multiple selectors for reliability */
+    [data-testid="stSidebar"][aria-expanded="false"] ~ [data-testid="stAppViewContainer"] .main,
+    [data-testid="collapsedControl"] ~ [data-testid="stAppViewContainer"] .main,
+    .main:has(~ [data-testid="stSidebar"][aria-expanded="false"]) {{
+        margin-left: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }}
+    
+    /* Ensure content container adjusts properly */
+    .main .block-container {{
+        max-width: 100%;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        transition: all 300ms ease-in-out;
+    }}
+    
+    /* When sidebar is collapsed, expand the main content area */
+    [data-testid="stSidebar"][aria-expanded="false"] {{
+        width: 0 !important;
+        min-width: 0 !important;
+    }}
+    
+    /* Adjust app view container when sidebar is collapsed */
+    [data-testid="stAppViewContainer"]:has([data-testid="stSidebar"][aria-expanded="false"]) {{
+        margin-left: 0 !important;
+    }}
+    
+    /* Fix for the collapse button positioning */
+    [data-testid="collapsedControl"] {{
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        z-index: 999999 !important;
     }}
     
     @keyframes fadeInUp {{
@@ -165,12 +212,36 @@ class ThemeManager:
         transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 0 4px 6px {colors['card_shadow']} !important;
         cursor: pointer;
+        width: 100%;
+        box-sizing: border-box;
     }}
     
     .feature-card:hover {{
         transform: translateY(-4px);
         border-color: {accent['primary']} !important;
         box-shadow: 0 12px 24px {colors['hover_shadow']} !important;
+    }}
+    
+    /* Ensure columns stay responsive */
+    [data-testid="column"] {{
+        min-width: 0;
+        flex: 1;
+        transition: all 300ms ease-in-out;
+    }}
+    
+    /* Adjust column layout when sidebar is collapsed */
+    [data-testid="stAppViewContainer"]:has([data-testid="stSidebar"][aria-expanded="false"]) [data-testid="column"] {{
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }}
+    
+    /* Ensure horizontal layout stays intact */
+    [data-testid="stHorizontalBlock"] {{
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 1rem;
+        width: 100%;
+        transition: all 300ms ease-in-out;
     }}
     
     .feature-icon {{
