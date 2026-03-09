@@ -51,8 +51,8 @@ def is_aws_ready():
         import streamlit as st
         return st.session_state.get("aws_ready", False)
     except:
-        # If not in Streamlit context, just check USE_AWS
-        return USE_AWS
+        # If not in Streamlit context or any error, return False
+        return False
 
 
 class TranslationEngine:

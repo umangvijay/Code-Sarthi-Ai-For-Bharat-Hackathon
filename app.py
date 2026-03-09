@@ -21,6 +21,10 @@ from monitoring_analytics import get_analytics
 from translation_engine import TranslationEngine
 from utils.theme_manager import ThemeManager
 
+# Initialize aws_ready flag early to prevent AttributeError
+if "aws_ready" not in st.session_state:
+    st.session_state.aws_ready = False
+
 
 # Page configuration
 st.set_page_config(
@@ -34,7 +38,16 @@ st.set_page_config(
 @st.cache_resource
 def initialize_aws_config():
     """Initialize AWS configuration (cached per session)"""
-    return AWSConfig(region_name="us-east-1")
+    config = AWSConfig(region_name="us-east-1")
+    return config
+
+
+@st.cache_resource
+def initialize_aws():
+    """Initialize and validate AWS services (cached per session)"""
+    config = initialize_aws_config()
+    valid, message = config.validate_aws()
+    return valid, message
 
 
 def initialize_session_state() -> None:
@@ -70,12 +83,10 @@ def check_aws_services():
         return st.session_state.aws_ready, "Services already checked"
 
     try:
-        # Initialize AWS config (cached)
-        st.session_state.aws_config = initialize_aws_config()
-        
-        # Validate AWS services
-        valid, message = st.session_state.aws_config.validate_aws()
+        # Initialize AWS config and validate (cached)
+        valid, message = initialize_aws()
         st.session_state.aws_ready = valid
+        st.session_state.aws_config = initialize_aws_config()
         st.session_state.services_checked = True
         
         if valid:
