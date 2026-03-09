@@ -104,8 +104,10 @@ class PollyTTS:
         if voice_type not in self.VOICE_CONFIGS:
             raise ValueError(f"Invalid voice_type: {voice_type}. Must be one of {list(self.VOICE_CONFIGS.keys())}")
         
-        # Local mode - return mock audio bytes
-        if not self.use_aws:
+        # Check AWS mode
+        if self.use_aws:
+            print(f"🟢 AWS Mode: Using Polly TTS for: {text[:50]}...")
+        else:
             print(f"🔵 Local Mode: TTS simulation for: {text[:50]}...")
             # Return minimal valid MP3 header (silent audio)
             return b'\xff\xfb\x90\x00' + b'\x00' * 100

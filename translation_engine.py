@@ -228,8 +228,11 @@ class TranslationEngine:
         Returns:
             Translated text with natural Hindi phrasing
         """
-        # Local mode - return simple mock translation
-        if not self.use_aws:
+        # Check AWS mode
+        if self.use_aws:
+            print("🟢 AWS Mode: Using Bedrock translation")
+        else:
+            print("🔵 Local Mode: Translation simulation")
             return f"🔵 Local Mode: Translation simulation\n\n{text}\n\n(Enable AWS mode for full Hinglish translation)"
         
         # Build the translation prompt

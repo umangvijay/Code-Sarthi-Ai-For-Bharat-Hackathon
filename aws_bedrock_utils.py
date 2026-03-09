@@ -71,12 +71,15 @@ class BedrockClient:
         Returns:
             dict with 'explanation' and 'language_detected' keys
         """
-        # Local mode - return mock response
-        if not self.use_aws:
+        # Check AWS mode
+        if self.use_aws:
+            print("🟢 AWS Mode: Using Bedrock for code explanation")
+        else:
+            print("🔵 Local Mode: AI simulation")
             language = self._detect_language(code_snippet)
             return {
                 "status": "success",
-                "explanation": f"🔵 Local Mode: AI simulation\n\nYeh code {language} mein likha gaya hai. Local mode mein detailed explanation available nahi hai. AWS mode enable karne ke liye USE_AWS=True environment variable set karein.\n\nCode snippet:\n{code_snippet[:200]}...",
+                "explanation": f"🔵 Local Mode: AI simulation\n\nYeh code {language} mein likha gaya hai. Local mode mein detailed explanation available nahi hai. AWS mode enable karne ke liye USE_AWS=true environment variable set karein.\n\nCode snippet:\n{code_snippet[:200]}...",
                 "language_detected": language,
                 "mode": "local"
             }

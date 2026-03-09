@@ -97,8 +97,10 @@ class TranscribeSTT:
         if language not in self.LANGUAGE_CONFIGS:
             raise ValueError(f"Invalid language: {language}. Must be one of {list(self.LANGUAGE_CONFIGS.keys())}")
         
-        # Local mode - return mock transcription
-        if not self.use_aws:
+        # Check AWS mode
+        if self.use_aws:
+            print(f"🟢 AWS Mode: Using Transcribe STT ({len(audio_bytes)} bytes)")
+        else:
             print(f"🔵 Local Mode: STT simulation ({len(audio_bytes)} bytes)")
             return {
                 'transcript': "Local Mode: Speech-to-text simulation. Actual transcription requires AWS mode.",
