@@ -144,9 +144,9 @@ class TranslationEngine:
             self.bedrock_client = None
             
         # Model ID for text generation
-        # Model ID: Cross-region inference profile for Amazon Nova 2 Lite
-        # This enables cross-region inference routing and resolves ValidationException
-        self.model_id = "us.amazon.nova-2-lite-v1:0"
+        # Model ID: Global inference profile for Amazon Nova 2 Lite
+        # Extracted from AWS CLI - works across all regions including ap-south-1
+        self.model_id = "global.amazon.nova-2-lite-v1:0"
         
         # Simple dictionary cache instead of LRU cache
         self._translation_cache = {}
