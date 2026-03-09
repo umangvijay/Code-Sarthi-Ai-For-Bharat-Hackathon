@@ -138,15 +138,30 @@ class ThemeManager:
         }}
     }}
     
-    /* Handle sidebar collapsed state - Multiple selectors for reliability */
-    [data-testid="stSidebar"][aria-expanded="false"] ~ [data-testid="stAppViewContainer"] .main,
-    [data-testid="collapsedControl"] ~ [data-testid="stAppViewContainer"] .main,
-    .main:has(~ [data-testid="stSidebar"][aria-expanded="false"]) {{
+    /* CRITICAL: Handle sidebar collapsed state with comprehensive selectors */
+    /* Target the main content area when sidebar is collapsed */
+    section[data-testid="stSidebar"][aria-expanded="false"] ~ div > div > div > div > section.main,
+    section[data-testid="stSidebar"][aria-expanded="false"] ~ * section.main,
+    div:has(> section[data-testid="stSidebar"][aria-expanded="false"]) section.main {{
         margin-left: 0 !important;
         width: 100% !important;
         max-width: 100% !important;
-        padding-left: 2rem !important;
-        padding-right: 2rem !important;
+        padding-left: 3rem !important;
+        padding-right: 3rem !important;
+    }}
+    
+    /* Ensure the app view container expands when sidebar is collapsed */
+    div[data-testid="stAppViewContainer"]:has(section[data-testid="stSidebar"][aria-expanded="false"]) {{
+        margin-left: 0 !important;
+        width: 100% !important;
+    }}
+    
+    /* Force the sidebar to take no space when collapsed */
+    section[data-testid="stSidebar"][aria-expanded="false"] {{
+        width: 0 !important;
+        min-width: 0 !important;
+        margin-left: -100% !important;
+        transform: translateX(-100%) !important;
     }}
     
     /* Ensure content container adjusts properly */
@@ -157,15 +172,11 @@ class ThemeManager:
         transition: all 300ms ease-in-out;
     }}
     
-    /* When sidebar is collapsed, expand the main content area */
-    [data-testid="stSidebar"][aria-expanded="false"] {{
-        width: 0 !important;
-        min-width: 0 !important;
-    }}
-    
-    /* Adjust app view container when sidebar is collapsed */
-    [data-testid="stAppViewContainer"]:has([data-testid="stSidebar"][aria-expanded="false"]) {{
-        margin-left: 0 !important;
+    /* When sidebar is collapsed, expand block container */
+    section[data-testid="stSidebar"][aria-expanded="false"] ~ * .block-container {{
+        max-width: 100% !important;
+        padding-left: 3rem !important;
+        padding-right: 3rem !important;
     }}
     
     /* Fix for the collapse button positioning */
@@ -174,6 +185,22 @@ class ThemeManager:
         left: 0 !important;
         top: 0 !important;
         z-index: 999999 !important;
+        background-color: {colors['sidebar']} !important;
+        border-right: 1px solid {colors['border']} !important;
+        padding: 0.5rem !important;
+        border-radius: 0 8px 8px 0 !important;
+    }}
+    
+    /* Ensure columns expand properly when sidebar is collapsed */
+    section[data-testid="stSidebar"][aria-expanded="false"] ~ * [data-testid="column"] {{
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+    }}
+    
+    /* Ensure horizontal blocks stay responsive */
+    section[data-testid="stSidebar"][aria-expanded="false"] ~ * [data-testid="stHorizontalBlock"] {{
+        width: 100% !important;
+        max-width: 100% !important;
     }}
     
     @keyframes fadeInUp {{
@@ -222,17 +249,12 @@ class ThemeManager:
         box-shadow: 0 12px 24px {colors['hover_shadow']} !important;
     }}
     
-    /* Ensure columns stay responsive */
+    /* Ensure columns stay responsive and properly sized */
     [data-testid="column"] {{
         min-width: 0;
-        flex: 1;
+        flex: 1 1 0;
         transition: all 300ms ease-in-out;
-    }}
-    
-    /* Adjust column layout when sidebar is collapsed */
-    [data-testid="stAppViewContainer"]:has([data-testid="stSidebar"][aria-expanded="false"]) [data-testid="column"] {{
-        padding-left: 0.5rem;
-        padding-right: 0.5rem;
+        padding: 0 0.5rem;
     }}
     
     /* Ensure horizontal layout stays intact */
@@ -242,6 +264,12 @@ class ThemeManager:
         gap: 1rem;
         width: 100%;
         transition: all 300ms ease-in-out;
+        align-items: stretch;
+    }}
+    
+    /* Ensure feature cards fill their columns properly */
+    [data-testid="column"] > div {{
+        height: 100%;
     }}
     
     .feature-icon {{
@@ -496,6 +524,73 @@ class ThemeManager:
         color: {colors['text_secondary']} !important;
     }}
 </style>
+
+<script>
+// Persist sidebar collapse state across Streamlit reruns
+(function() {{
+    // Check if sidebar state is stored
+    const sidebarCollapsed = sessionStorage.getItem('sidebarCollapsed');
+    
+    // Function to update sidebar state
+    function updateSidebarState() {{
+        const sidebar = document.querySelector('section[data-testid="stSidebar"]');
+        if (sidebar) {{
+            const isCollapsed = sidebar.getAttribute('aria-expanded') === 'false';
+            sessionStorage.setItem('sidebarCollapsed', isCollapsed ? 'true' : 'false');
+        }}
+    }}
+    
+    // Function to apply stored sidebar state
+    function applySidebarState() {{
+        if (sidebarCollapsed === 'true') {{
+            const collapseButton = document.querySelector('[data-testid="collapsedControl"]');
+            const sidebar = document.querySelector('section[data-testid="stSidebar"]');
+            
+            // If sidebar is expanded but should be collapsed, click the collapse button
+            if (sidebar && sidebar.getAttribute('aria-expanded') !== 'false' && collapseButton) {{
+                // Small delay to ensure Streamlit has finished rendering
+                setTimeout(() => {{
+                    collapseButton.click();
+                }}, 100);
+            }}
+        }}
+    }}
+    
+    // Apply state on page load
+    if (document.readyState === 'loading') {{
+        document.addEventListener('DOMContentLoaded', applySidebarState);
+    }} else {{
+        applySidebarState();
+    }}
+    
+    // Watch for sidebar state changes
+    const observer = new MutationObserver(function(mutations) {{
+        mutations.forEach(function(mutation) {{
+            if (mutation.type === 'attributes' && mutation.attributeName === 'aria-expanded') {{
+                updateSidebarState();
+            }}
+        }});
+    }});
+    
+    // Start observing sidebar for attribute changes
+    const checkSidebar = setInterval(() => {{
+        const sidebar = document.querySelector('section[data-testid="stSidebar"]');
+        if (sidebar) {{
+            observer.observe(sidebar, {{ attributes: true }});
+            clearInterval(checkSidebar);
+        }}
+    }}, 100);
+    
+    // Also watch for collapse button clicks
+    const checkCollapseButton = setInterval(() => {{
+        const collapseButton = document.querySelector('[data-testid="collapsedControl"]');
+        if (collapseButton) {{
+            collapseButton.addEventListener('click', updateSidebarState);
+            clearInterval(checkCollapseButton);
+        }}
+    }}, 100);
+}})();
+</script>
 """
         st.markdown(css, unsafe_allow_html=True)
     

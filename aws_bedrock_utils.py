@@ -2,19 +2,46 @@
 AWS Bedrock Utilities for Code-Sarthi
 Handles AI reasoning and Hinglish translation using Claude 3.5 Sonnet
 Supports Hybrid Mode for offline operation
-Includes retry logic for API resilience
+Includes retry logic for API resilience and throttling protection
+Includes response caching and request deduplication
 """
 
 import boto3
 import json
 import os
-from typing import Optional
+import time
+import hashlib
+from typing import Optional, Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import ClientError
 
 # Force AWS Mode - EC2 with IAM Role
 # Set USE_AWS=False in environment to disable (for local development only)
 USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
+
+# Global throttling state
+LAST_BEDROCK_CALL = 0
+THROTTLE_DELAY = 1.0  # Minimum seconds between Bedrock calls
+
+# Maximum prompt length to reduce token usage
+MAX_PROMPT_LENGTH = 3000
+
+
+def throttle_bedrock():
+    """Throttle Bedrock API calls to prevent rate limiting"""
+    global LAST_BEDROCK_CALL
+    now = time.time()
+    elapsed = now - LAST_BEDROCK_CALL
+    if elapsed < THROTTLE_DELAY:
+        sleep_time = THROTTLE_DELAY - elapsed
+        print(f"⏱️  Throttling Bedrock call ({sleep_time:.2f}s)")
+        time.sleep(sleep_time)
+    LAST_BEDROCK_CALL = time.time()
+
+
+def get_prompt_hash(prompt: str) -> str:
+    """Generate a hash for prompt deduplication"""
+    return hashlib.md5(prompt.encode()).hexdigest()
 
 
 def is_aws_ready():
@@ -73,6 +100,7 @@ class BedrockClient:
         """
         Generate Hinglish explanation for code snippet using Claude 3.5 Sonnet (Hybrid Mode aware)
         Includes retry logic with exponential backoff for API resilience
+        Includes response caching and request deduplication
         
         Args:
             code_snippet: The code to explain
@@ -101,6 +129,39 @@ class BedrockClient:
         # Construct the prompt for Hinglish explanation
         prompt = self._build_hinglish_prompt(code_snippet, context, complexity_level)
         
+        # Check for duplicate request
+        try:
+            import streamlit as st
+            prompt_hash = get_prompt_hash(prompt)
+            
+            if "bedrock_code_cache" not in st.session_state:
+                st.session_state.bedrock_code_cache = {}
+            
+            if prompt_hash in st.session_state.bedrock_code_cache:
+                print("📦 Using cached code explanation response")
+                return st.session_state.bedrock_code_cache[prompt_hash]
+        except:
+            pass  # If not in Streamlit context, skip caching
+        
+        # Limit prompt size to reduce token usage
+        if len(prompt) > MAX_PROMPT_LENGTH:
+            prompt = prompt[:MAX_PROMPT_LENGTH]
+            print(f"⚠️  Prompt truncated to {MAX_PROMPT_LENGTH} characters")
+            return {
+                "status": "success",
+                "explanation": f"🔵 Local Mode: AI simulation\n\nYeh code {language} mein likha gaya hai. Local mode mein detailed explanation available nahi hai. AWS mode enable karne ke liye USE_AWS=true environment variable set karein.\n\nCode snippet:\n{code_snippet[:200]}...",
+                "language_detected": language,
+                "mode": "local"
+            }
+        
+        # Construct the prompt for Hinglish explanation
+        prompt = self._build_hinglish_prompt(code_snippet, context, complexity_level)
+        
+        # Limit prompt size to prevent token overuse
+        if len(prompt) > 5000:
+            prompt = prompt[:5000]
+            print("⚠️  Prompt truncated to 5000 characters")
+        
         # Prepare request body
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",
@@ -114,33 +175,63 @@ class BedrockClient:
             "temperature": 0.7
         }
         
-        try:
-            # Invoke Bedrock (retry decorator handles failures)
-            response = self.client.invoke_model(
-                modelId=self.model_id,
-                body=json.dumps(request_body)
-            )
-            
-            # Parse response
-            response_body = json.loads(response['body'].read())
-            explanation = response_body['content'][0]['text']
-            
-            # Detect programming language
-            language = self._detect_language(code_snippet)
-            
-            return {
-                "status": "success",
-                "explanation": explanation,
-                "language_detected": language,
-                "mode": "aws"
-            }
-            
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Bedrock API call mein error aaya: {str(e)}",
-                "mode": "aws"
-            }
+        # Retry logic with throttling protection
+        for attempt in range(3):
+            try:
+                # Throttle to prevent rate limiting
+                throttle_bedrock()
+                
+                print(f"🟢 Bedrock request sent (attempt {attempt + 1}/3)")
+                
+                # Invoke Bedrock
+                response = self.client.invoke_model(
+                    modelId=self.model_id,
+                    body=json.dumps(request_body)
+                )
+                
+                # Parse response
+                response_body = json.loads(response['body'].read())
+                explanation = response_body['content'][0]['text']
+                
+                # Detect programming language
+                language = self._detect_language(code_snippet)
+                
+                result = {
+                    "status": "success",
+                    "explanation": explanation,
+                    "language_detected": language,
+                    "mode": "aws"
+                }
+                
+                # Cache the response
+                try:
+                    import streamlit as st
+                    if "bedrock_code_cache" in st.session_state:
+                        st.session_state.bedrock_code_cache[prompt_hash] = result
+                        print("💾 Response cached for future use")
+                except:
+                    pass
+                
+                return result
+                
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                if error_code == 'ThrottlingException':
+                    print(f"⚠️  Bedrock throttling detected (attempt {attempt + 1}/3)")
+                    if attempt < 2:
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                        continue
+                raise
+            except Exception as e:
+                if attempt < 2:
+                    print(f"⚠️  Bedrock error, retrying (attempt {attempt + 1}/3)")
+                    time.sleep(1)
+                    continue
+                return {
+                    "status": "error",
+                    "message": f"Bedrock API call mein error aaya: {str(e)}",
+                    "mode": "aws"
+                }
     
     def _build_hinglish_prompt(
         self, 

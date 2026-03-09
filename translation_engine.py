@@ -36,6 +36,7 @@ import re
 import json
 import boto3
 import os
+import time
 import hashlib
 from typing import List, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -43,6 +44,30 @@ from botocore.exceptions import ClientError
 
 # Hybrid Mode Configuration
 USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
+
+# Global throttling state
+LAST_BEDROCK_CALL = 0
+THROTTLE_DELAY = 1.0  # Minimum seconds between Bedrock calls
+
+# Maximum prompt length to reduce token usage
+MAX_PROMPT_LENGTH = 3000
+
+
+def throttle_bedrock():
+    """Throttle Bedrock API calls to prevent rate limiting"""
+    global LAST_BEDROCK_CALL
+    now = time.time()
+    elapsed = now - LAST_BEDROCK_CALL
+    if elapsed < THROTTLE_DELAY:
+        sleep_time = THROTTLE_DELAY - elapsed
+        print(f"⏱️  Throttling Bedrock call ({sleep_time:.2f}s)")
+        time.sleep(sleep_time)
+    LAST_BEDROCK_CALL = time.time()
+
+
+def get_prompt_hash(prompt: str) -> str:
+    """Generate a hash for prompt deduplication"""
+    return hashlib.md5(prompt.encode()).hexdigest()
 
 
 def is_aws_ready():
@@ -252,6 +277,25 @@ class TranslationEngine:
         # Build the translation prompt
         prompt = self._build_translation_prompt(text, terms)
         
+        # Check for duplicate request
+        try:
+            import streamlit as st
+            prompt_hash = get_prompt_hash(prompt)
+            
+            if "bedrock_translation_cache" not in st.session_state:
+                st.session_state.bedrock_translation_cache = {}
+            
+            if prompt_hash in st.session_state.bedrock_translation_cache:
+                print("📦 Using cached translation response")
+                return st.session_state.bedrock_translation_cache[prompt_hash]
+        except:
+            pass  # If not in Streamlit context, skip caching
+        
+        # Limit prompt size to reduce token usage
+        if len(prompt) > MAX_PROMPT_LENGTH:
+            prompt = prompt[:MAX_PROMPT_LENGTH]
+            print(f"⚠️  Prompt truncated to {MAX_PROMPT_LENGTH} characters")
+        
         # Prepare request body for Bedrock
         request_body = {
             "anthropic_version": "bedrock-2023-05-31",
@@ -265,22 +309,53 @@ class TranslationEngine:
             "temperature": 0.5  # Lower temperature for more consistent translations
         }
         
-        try:
-            # Invoke Bedrock (retry decorator handles failures)
-            response = self.bedrock_client.invoke_model(
-                modelId=self.model_id,
-                body=json.dumps(request_body)
-            )
-            
-            # Parse response
-            response_body = json.loads(response['body'].read())
-            translated_text = response_body['content'][0]['text']
-            
-            return translated_text.strip()
-            
-        except Exception as e:
-            # If translation fails after retries, return original text with error note
-            return f"{text}\n\n[Translation error: {str(e)}]"
+        # Retry logic with throttling protection
+        for attempt in range(3):
+            try:
+                # Throttle to prevent rate limiting
+                throttle_bedrock()
+                
+                print(f"🟢 Bedrock request sent (attempt {attempt + 1}/3)")
+                
+                # Invoke Bedrock
+                response = self.bedrock_client.invoke_model(
+                    modelId=self.model_id,
+                    body=json.dumps(request_body)
+                )
+                
+                # Parse response
+                response_body = json.loads(response['body'].read())
+                translated_text = response_body['content'][0]['text'].strip()
+                
+                # Cache the response
+                try:
+                    import streamlit as st
+                    if "bedrock_translation_cache" in st.session_state:
+                        st.session_state.bedrock_translation_cache[prompt_hash] = translated_text
+                        print("💾 Translation cached for future use")
+                except:
+                    pass
+                
+                return translated_text
+                
+            except ClientError as e:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                if error_code == 'ThrottlingException':
+                    print(f"⚠️  Bedrock throttling detected (attempt {attempt + 1}/3)")
+                    if attempt < 2:
+                        time.sleep(2 ** attempt)  # Exponential backoff
+                        continue
+                raise
+            except Exception as e:
+                if attempt < 2:
+                    print(f"⚠️  Bedrock error, retrying (attempt {attempt + 1}/3)")
+                    time.sleep(1)
+                    continue
+                # If translation fails after retries, return original text with error note
+                return f"{text}\n\n[Translation error: {str(e)}]"
+        
+        # Fallback if all retries failed
+        return f"{text}\n\n[Translation failed after 3 attempts]"
     
     def _build_translation_prompt(self, text: str, preserve_terms: List[str]) -> str:
         """

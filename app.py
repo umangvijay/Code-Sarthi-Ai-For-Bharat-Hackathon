@@ -30,7 +30,7 @@ st.set_page_config(
     page_title="Code-Sarthi - Hinglish Code Assistant",
     page_icon="🎓",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",  # Start collapsed to respect user preference
 )
 
 
@@ -77,7 +77,7 @@ except Exception as e:
 
 
 # Initialize RAG engine immediately after AWS
-if "rag_engine" not in st.session_state:
+if "rag_engine" not in st.session_state or st.session_state.rag_engine is None:
     try:
         st.session_state.rag_engine = initialize_rag()
         if st.session_state.rag_engine is None:
