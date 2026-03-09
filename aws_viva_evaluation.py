@@ -31,6 +31,8 @@ Usage Example:
 import boto3
 import json
 from typing import Dict, List, Optional
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from botocore.exceptions import ClientError
 
 
 class VivaAnswerEvaluator:
@@ -63,6 +65,11 @@ class VivaAnswerEvaluator:
         # self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Claude inference profile
         self.model_id = "us.amazon.nova-lite-v1:0"  # Current: Nova Lite cross-region inference profile in us-east-1
     
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(ClientError)
+    )
     def evaluate_answer(
         self,
         question: str,

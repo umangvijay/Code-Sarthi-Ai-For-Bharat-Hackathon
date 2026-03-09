@@ -19,6 +19,7 @@ from typing import List, Dict, Optional, Callable
 import boto3
 from botocore.exceptions import ClientError
 import numpy as np
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # Try to import tiktoken for accurate token counting
 try:
@@ -113,6 +114,11 @@ class RAGEngine:
             self.tokenizer = None
             self.metadata = {'documents': {}}
     
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(ClientError)
+    )
     def _get_embedding(self, text: str) -> Optional[np.ndarray]:
         """
         Generate embedding using Amazon Titan Embeddings via Bedrock
