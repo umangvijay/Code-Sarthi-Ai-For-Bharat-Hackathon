@@ -654,7 +654,7 @@ def test_data_deletion():
     # This is just a structure demonstration
     
     manager = DataDeletionManager(
-        bucket_name="code-sarthi-pdfs-umang-live",
+        bucket_name="code-sarthi-hackathon-data-2026",
         kendra_index_id=None  # Optional
     )
     

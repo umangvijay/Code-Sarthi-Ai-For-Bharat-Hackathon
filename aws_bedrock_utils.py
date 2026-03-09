@@ -11,6 +11,7 @@ import json
 import os
 import time
 import hashlib
+import threading
 from typing import Optional, Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import ClientError
@@ -21,10 +22,13 @@ USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
 
 # Global throttling state
 LAST_BEDROCK_CALL = 0
-THROTTLE_DELAY = 1.0  # Minimum seconds between Bedrock calls
+THROTTLE_DELAY = 1.5  # 1.5 second delay between Bedrock calls (max ~40 calls/min)
+
+# Global request lock to prevent parallel calls
+REQUEST_LOCK = threading.Lock()
 
 # Maximum prompt length to reduce token usage
-MAX_PROMPT_LENGTH = 3000
+MAX_PROMPT_LENGTH = 1500  # Reduced for Nova 2 Lite quota management
 
 
 def throttle_bedrock():
@@ -58,7 +62,7 @@ def is_aws_ready():
 class BedrockClient:
     """Client for interacting with Amazon Bedrock (Claude 3.5 Sonnet) with Hybrid Mode support"""
     
-    def __init__(self, region_name: str = "us-east-1"):
+    def __init__(self, region_name: str = "ap-south-1"):
         """
         Initialize Bedrock client with Hybrid Mode support
         
@@ -74,7 +78,10 @@ class BedrockClient:
         # self.model_id = "amazon.nova-micro-v1:0"  # Previous: Nova Micro in ap-northeast-3
         # self.model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Raw model ID (doesn't support on-demand)
         # self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Claude inference profile
-        self.model_id = "us.amazon.nova-lite-v1:0"  # Current: Nova Lite cross-region inference profile in us-east-1
+        # self.model_id = "us.amazon.nova-lite-v1:0"  # Previous: Nova Lite cross-region (hit daily token limit)
+        # self.model_id = "anthropic.claude-3-haiku-20240307-v1:0"  # Previous: Claude 3 Haiku (hit token limit)
+        # self.model_id = "amazon.nova-lite-v1:0"  # Previous: Amazon Nova 2 Lite in ap-south-1 (Mumbai)
+        self.model_id = "amazon.nova-2-lite-v1:0"  # Current: Amazon Nova 2 Lite in ap-south-1 (Mumbai)
         
         if self.use_aws:
             # Use IAM roles via boto3.Session() for security
@@ -86,11 +93,6 @@ class BedrockClient:
         else:
             self.client = None
     
-    @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(ClientError)
-    )
     def explain_code_in_hinglish(
         self, 
         code_snippet: str, 
@@ -98,9 +100,8 @@ class BedrockClient:
         complexity_level: str = "beginner"
     ) -> dict:
         """
-        Generate Hinglish explanation for code snippet using Claude 3.5 Sonnet (Hybrid Mode aware)
-        Includes retry logic with exponential backoff for API resilience
-        Includes response caching and request deduplication
+        Generate Hinglish explanation for code snippet using Nova 2 Lite (Hybrid Mode aware)
+        Single request per prompt with comprehensive protections
         
         Args:
             code_snippet: The code to explain
@@ -110,6 +111,15 @@ class BedrockClient:
         Returns:
             dict with 'explanation' and 'language_detected' keys
         """
+        # Validate code snippet is not empty
+        if not code_snippet or len(code_snippet.strip()) == 0:
+            return {
+                "status": "error",
+                "explanation": "⚠️ Please enter valid code to explain.",
+                "language_detected": "unknown",
+                "mode": "error"
+            }
+        
         # Check AWS mode and readiness
         if self.use_aws and is_aws_ready():
             print("🟢 AWS Mode: Using Bedrock for code explanation")
@@ -158,80 +168,74 @@ class BedrockClient:
         prompt = self._build_hinglish_prompt(code_snippet, context, complexity_level)
         
         # Limit prompt size to prevent token overuse
-        if len(prompt) > 5000:
-            prompt = prompt[:5000]
-            print("⚠️  Prompt truncated to 5000 characters")
+        if len(prompt) > MAX_PROMPT_LENGTH:
+            prompt = prompt[:MAX_PROMPT_LENGTH]
+            print(f"⚠️  Prompt truncated to {MAX_PROMPT_LENGTH} characters")
         
-        # Prepare request body
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 2000,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "temperature": 0.7
-        }
-        
-        # Retry logic with throttling protection
-        for attempt in range(3):
-            try:
-                # Throttle to prevent rate limiting
-                throttle_bedrock()
-                
-                print(f"🟢 Bedrock request sent (attempt {attempt + 1}/3)")
-                
-                # Invoke Bedrock
-                response = self.client.invoke_model(
+        # Single request with lock - NO RETRIES
+        try:
+            # Throttle to prevent rate limiting
+            throttle_bedrock()
+            
+            print("🔒 Bedrock request triggered (SINGLE REQUEST - NO RETRIES)")
+            
+            # Use request lock to prevent parallel calls
+            with REQUEST_LOCK:
+                # Use Converse API with Nova 2 Lite optimized settings
+                response = self.client.converse(
                     modelId=self.model_id,
-                    body=json.dumps(request_body)
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [{"text": prompt}]
+                        }
+                    ],
+                    inferenceConfig={
+                        "maxTokens": 600,
+                        "temperature": 0.3
+                    }
                 )
-                
-                # Parse response
-                response_body = json.loads(response['body'].read())
-                explanation = response_body['content'][0]['text']
-                
-                # Detect programming language
-                language = self._detect_language(code_snippet)
-                
-                result = {
-                    "status": "success",
-                    "explanation": explanation,
-                    "language_detected": language,
-                    "mode": "aws"
-                }
-                
-                # Cache the response
-                try:
-                    import streamlit as st
-                    if "bedrock_code_cache" in st.session_state:
-                        st.session_state.bedrock_code_cache[prompt_hash] = result
-                        print("💾 Response cached for future use")
-                except:
-                    pass
-                
-                return result
-                
-            except ClientError as e:
-                error_code = e.response.get('Error', {}).get('Code', '')
-                if error_code == 'ThrottlingException':
-                    print(f"⚠️  Bedrock throttling detected (attempt {attempt + 1}/3)")
-                    if attempt < 2:
-                        time.sleep(2 ** attempt)  # Exponential backoff
-                        continue
-                raise
-            except Exception as e:
-                if attempt < 2:
-                    print(f"⚠️  Bedrock error, retrying (attempt {attempt + 1}/3)")
-                    time.sleep(1)
-                    continue
-                return {
-                    "status": "error",
-                    "message": f"Bedrock API call mein error aaya: {str(e)}",
-                    "mode": "aws"
-                }
+            
+            # Parse response from Converse API
+            explanation = response['output']['message']['content'][0]['text']
+            
+            # Detect programming language
+            language = self._detect_language(code_snippet)
+            
+            result = {
+                "status": "success",
+                "explanation": explanation,
+                "language_detected": language,
+                "mode": "aws"
+            }
+            
+            # Cache the response
+            try:
+                import streamlit as st
+                if "bedrock_code_cache" in st.session_state:
+                    st.session_state.bedrock_code_cache[prompt_hash] = result
+                    print("💾 Response cached for future use")
+            except:
+                pass
+            
+            return result
+            
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            print(f"❌ Bedrock error: {error_code} - {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Bedrock API error: {error_code}",
+                "mode": "aws"
+            }
+        except Exception as e:
+            print(f"❌ Unexpected error: {str(e)}")
+            return {
+                "status": "error",
+                "message": f"Bedrock API call mein error aaya: {str(e)}",
+                "mode": "aws"
+            }
+
     
     def _build_hinglish_prompt(
         self, 

@@ -52,7 +52,7 @@ class RAGEngine:
         region_name: str = "us-east-1",
         metadata_file: str = "pdf_metadata.json",
         use_aws: bool = True,
-        s3_bucket_name: str = "code-sarthi-pdfs-umang-live"
+        s3_bucket_name: str = "code-sarthi-hackathon-data-2026"
     ):
         """
         Initialize RAG Engine with FAISS + Titan Embeddings
@@ -114,11 +114,6 @@ class RAGEngine:
             self.tokenizer = None
             self.metadata = {'documents': {}}
     
-    @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(ClientError)
-    )
     def _get_embedding(self, text: str) -> Optional[np.ndarray]:
         """
         Generate embedding using Amazon Titan Embeddings via Bedrock

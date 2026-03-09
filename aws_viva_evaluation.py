@@ -30,9 +30,36 @@ Usage Example:
 
 import boto3
 import json
+import hashlib
+import threading
+import time
 from typing import Dict, List, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import ClientError
+
+# Global request lock to prevent parallel calls
+REQUEST_LOCK = threading.Lock()
+
+# Global throttling state
+LAST_BEDROCK_CALL = 0
+THROTTLE_DELAY = 1.5  # 1.5 second delay between Bedrock calls (max ~40 calls/min)
+
+
+def throttle_bedrock():
+    """Throttle Bedrock API calls to prevent rate limiting"""
+    global LAST_BEDROCK_CALL
+    now = time.time()
+    elapsed = now - LAST_BEDROCK_CALL
+    if elapsed < THROTTLE_DELAY:
+        sleep_time = THROTTLE_DELAY - elapsed
+        print(f"⏱️  Throttling Bedrock call ({sleep_time:.2f}s)")
+        time.sleep(sleep_time)
+    LAST_BEDROCK_CALL = time.time()
+
+
+def get_prompt_hash(prompt: str) -> str:
+    """Generate a hash for prompt deduplication"""
+    return hashlib.md5(prompt.encode()).hexdigest()
 
 
 class VivaAnswerEvaluator:
@@ -45,7 +72,7 @@ class VivaAnswerEvaluator:
     - Clarity: How well the answer is explained
     """
     
-    def __init__(self, region_name: str = "us-east-1"):
+    def __init__(self, region_name: str = "ap-south-1"):
         """
         Initialize Viva Answer Evaluator
         
@@ -63,13 +90,11 @@ class VivaAnswerEvaluator:
         # self.model_id = "amazon.nova-micro-v1:0"  # Previous: Nova Micro in ap-northeast-3
         # self.model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Raw model ID (doesn't support on-demand)
         # self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Claude inference profile
-        self.model_id = "us.amazon.nova-lite-v1:0"  # Current: Nova Lite cross-region inference profile in us-east-1
+        # self.model_id = "us.amazon.nova-lite-v1:0"  # Previous: Nova Lite cross-region (hit daily token limit)
+        # self.model_id = "anthropic.claude-3-haiku-20240307-v1:0"  # Previous: Claude 3 Haiku (hit token limit)
+        # self.model_id = "amazon.nova-lite-v1:0"  # Previous: Amazon Nova 2 Lite in ap-south-1 (Mumbai)
+        self.model_id = "amazon.nova-2-lite-v1:0"  # Current: Amazon Nova 2 Lite in ap-south-1 (Mumbai)
     
-    @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(ClientError)
-    )
     def evaluate_answer(
         self,
         question: str,
@@ -79,6 +104,7 @@ class VivaAnswerEvaluator:
     ) -> Dict:
         """
         Evaluate a viva answer across three dimensions
+        Single request per prompt with comprehensive protections
         
         Args:
             question: The viva question that was asked
@@ -96,42 +122,99 @@ class VivaAnswerEvaluator:
                 - follow_up_question: str (Next question based on answer)
                 - evaluation_details: dict (detailed breakdown)
         """
+        # Validate inputs are not empty
+        if not question or len(question.strip()) == 0:
+            return {
+                "status": "error",
+                "message": "⚠️ Please enter a valid question.",
+                "correctness_score": 0.0,
+                "completeness_score": 0.0,
+                "clarity_score": 0.0,
+                "overall_score": 0.0,
+                "feedback": "Question missing.",
+                "follow_up_question": ""
+            }
+        
+        if not answer or len(answer.strip()) == 0:
+            return {
+                "status": "error",
+                "message": "⚠️ Please enter a valid answer.",
+                "correctness_score": 0.0,
+                "completeness_score": 0.0,
+                "clarity_score": 0.0,
+                "overall_score": 0.0,
+                "feedback": "Answer missing.",
+                "follow_up_question": question
+            }
+        
         # Build evaluation prompt
         prompt = self._build_evaluation_prompt(
             question, answer, expected_concepts, context
         )
         
-        # Prepare request body for Bedrock
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 2000,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "temperature": 0.3  # Lower temperature for consistent evaluation
-        }
+        # Limit prompt size
+        if len(prompt) > 1500:
+            prompt = prompt[:1500]
+            print(f"⚠️  Prompt truncated to 1500 characters")
+        
+        # Check for duplicate request (caching)
+        try:
+            import streamlit as st
+            prompt_hash = get_prompt_hash(prompt)
+            
+            if "bedrock_viva_cache" not in st.session_state:
+                st.session_state.bedrock_viva_cache = {}
+            
+            if prompt_hash in st.session_state.bedrock_viva_cache:
+                print("📦 Using cached viva evaluation response")
+                return st.session_state.bedrock_viva_cache[prompt_hash]
+        except:
+            pass  # If not in Streamlit context, skip caching
         
         try:
-            # Invoke Bedrock
-            response = self.bedrock_client.invoke_model(
-                modelId=self.model_id,
-                body=json.dumps(request_body)
+            # Throttle to prevent rate limiting
+            throttle_bedrock()
+            
+            print("🔒 Bedrock request triggered (SINGLE REQUEST - NO RETRIES)")
+            
+            # Use request lock to prevent parallel calls
+            with REQUEST_LOCK:
+                # Use Converse API with Nova 2 Lite optimized settings
+                response = self.bedrock_client.converse(
+                    modelId=self.model_id,
+                    messages=[
+                        {
+                            "role": "user",
+                        "content": [{"text": prompt}]
+                    }
+                ],
+                inferenceConfig={
+                    "maxTokens": 600,
+                    "temperature": 0.3
+                }
             )
             
-            # Parse response
-            response_body = json.loads(response['body'].read())
-            evaluation_text = response_body['content'][0]['text']
+            # Parse response from Converse API
+            evaluation_text = response['output']['message']['content'][0]['text']
             
             # Parse the structured evaluation
             result = self._parse_evaluation_response(evaluation_text)
             
-            return {
+            final_result = {
                 "status": "success",
                 **result
             }
+            
+            # Cache the response
+            try:
+                import streamlit as st
+                if "bedrock_viva_cache" in st.session_state:
+                    st.session_state.bedrock_viva_cache[prompt_hash] = final_result
+                    print("💾 Viva evaluation cached for future use")
+            except:
+                pass
+            
+            return final_result
             
         except Exception as e:
             return {

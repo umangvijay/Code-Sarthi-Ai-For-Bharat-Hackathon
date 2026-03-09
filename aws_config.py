@@ -11,13 +11,13 @@ from botocore.exceptions import ClientError, NoCredentialsError
 USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
 
 # S3 Bucket Configuration - Live production bucket
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "code-sarthi-pdfs-umang-live")
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "code-sarthi-hackathon-data-2026")
 
 
 class AWSConfig:
     """Manages AWS configuration and validates credentials using EC2 IAM Role"""
     
-    def __init__(self, region_name="us-east-1"):
+    def __init__(self, region_name="ap-south-1"):
         """
         Initialize AWS configuration with EC2 IAM Role support
         

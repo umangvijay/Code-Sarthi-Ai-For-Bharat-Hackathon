@@ -100,7 +100,7 @@ st.markdown("""
 @st.cache_resource
 def initialize_aws_config():
     """Initialize AWS configuration (cached per session)"""
-    config = AWSConfig(region_name="us-east-1")
+    config = AWSConfig(region_name="ap-south-1")
     return config
 
 

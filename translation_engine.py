@@ -38,6 +38,7 @@ import boto3
 import os
 import time
 import hashlib
+import threading
 from typing import List, Optional
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import ClientError
@@ -47,10 +48,13 @@ USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
 
 # Global throttling state
 LAST_BEDROCK_CALL = 0
-THROTTLE_DELAY = 1.0  # Minimum seconds between Bedrock calls
+THROTTLE_DELAY = 1.5  # 1.5 second delay between Bedrock calls (max ~40 calls/min)
+
+# Global request lock to prevent parallel calls
+REQUEST_LOCK = threading.Lock()
 
 # Maximum prompt length to reduce token usage
-MAX_PROMPT_LENGTH = 3000
+MAX_PROMPT_LENGTH = 1500  # Reduced for Nova 2 Lite quota management
 
 
 def throttle_bedrock():
@@ -147,7 +151,10 @@ class TranslationEngine:
         # self.model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Raw model ID (doesn't support on-demand)
         # self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Claude inference profile in ap-northeast-1
         # self.model_id = "amazon.nova-2-lite-v1:0"  # Previous: Nova 2 Lite raw model ID
-        self.model_id = "us.amazon.nova-lite-v1:0"  # Current: Nova Lite cross-region inference profile in us-east-1
+        # self.model_id = "us.amazon.nova-lite-v1:0"  # Previous: Nova Lite cross-region (hit daily token limit)
+        # self.model_id = "anthropic.claude-3-haiku-20240307-v1:0"  # Previous: Claude 3 Haiku (hit token limit)
+        # self.model_id = "amazon.nova-lite-v1:0"  # Previous: Amazon Nova 2 Lite in ap-south-1 (Mumbai)
+        self.model_id = "amazon.nova-2-lite-v1:0"  # Current: Amazon Nova 2 Lite in ap-south-1 (Mumbai)
         
         # Simple dictionary cache instead of LRU cache
         self._translation_cache = {}
@@ -247,15 +254,10 @@ class TranslationEngine:
         
         return detected
     
-    @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type(ClientError)
-    )
     def apply_translation_rules(self, text: str, terms: List[str]) -> str:
         """
         Applies Hinglish translation rules using Bedrock (Hybrid Mode aware)
-        Includes retry logic with exponential backoff for resilience
+        Single request per prompt with comprehensive protections
         
         Args:
             text: English text to translate
@@ -270,6 +272,10 @@ class TranslationEngine:
         
         if not is_aws_ready():
             return f"⚠️ AWS services not ready. Please check your AWS configuration."
+        
+        # Validate prompt is not empty
+        if not text or len(text.strip()) == 0:
+            return "⚠️ Please enter valid text to translate."
         
         print("🟢 AWS Mode: Using Bedrock translation")
         
@@ -295,66 +301,51 @@ class TranslationEngine:
             prompt = prompt[:MAX_PROMPT_LENGTH]
             print(f"⚠️  Prompt truncated to {MAX_PROMPT_LENGTH} characters")
         
-        # Prepare request body for Bedrock
-        request_body = {
-            "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": 3000,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "temperature": 0.5  # Lower temperature for more consistent translations
-        }
-        
-        # Retry logic with throttling protection
-        for attempt in range(3):
-            try:
-                # Throttle to prevent rate limiting
-                throttle_bedrock()
-                
-                print(f"🟢 Bedrock request sent (attempt {attempt + 1}/3)")
-                
-                # Invoke Bedrock
-                response = self.bedrock_client.invoke_model(
+        # Single request with lock - NO RETRIES
+        try:
+            # Throttle to prevent rate limiting
+            throttle_bedrock()
+            
+            print("🔒 Bedrock request triggered (SINGLE REQUEST - NO RETRIES)")
+            
+            # Use request lock to prevent parallel calls
+            with REQUEST_LOCK:
+                # Use Converse API with Nova 2 Lite optimized settings
+                response = self.bedrock_client.converse(
                     modelId=self.model_id,
-                    body=json.dumps(request_body)
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [{"text": prompt}]
+                        }
+                    ],
+                    inferenceConfig={
+                        "maxTokens": 600,
+                        "temperature": 0.3
+                    }
                 )
-                
-                # Parse response
-                response_body = json.loads(response['body'].read())
-                translated_text = response_body['content'][0]['text'].strip()
-                
-                # Cache the response
-                try:
-                    import streamlit as st
-                    if "bedrock_translation_cache" in st.session_state:
-                        st.session_state.bedrock_translation_cache[prompt_hash] = translated_text
-                        print("💾 Translation cached for future use")
-                except:
-                    pass
-                
-                return translated_text
-                
-            except ClientError as e:
-                error_code = e.response.get('Error', {}).get('Code', '')
-                if error_code == 'ThrottlingException':
-                    print(f"⚠️  Bedrock throttling detected (attempt {attempt + 1}/3)")
-                    if attempt < 2:
-                        time.sleep(2 ** attempt)  # Exponential backoff
-                        continue
-                raise
-            except Exception as e:
-                if attempt < 2:
-                    print(f"⚠️  Bedrock error, retrying (attempt {attempt + 1}/3)")
-                    time.sleep(1)
-                    continue
-                # If translation fails after retries, return original text with error note
-                return f"{text}\n\n[Translation error: {str(e)}]"
-        
-        # Fallback if all retries failed
-        return f"{text}\n\n[Translation failed after 3 attempts]"
+            
+            # Parse response from Converse API
+            translated_text = response['output']['message']['content'][0]['text'].strip()
+            
+            # Cache the response
+            try:
+                import streamlit as st
+                if "bedrock_translation_cache" in st.session_state:
+                    st.session_state.bedrock_translation_cache[prompt_hash] = translated_text
+                    print("💾 Translation cached for future use")
+            except:
+                pass
+            
+            return translated_text
+            
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            print(f"❌ Bedrock error: {error_code} - {str(e)}")
+            return f"{text}\n\n[Translation error: {error_code}]"
+        except Exception as e:
+            print(f"❌ Unexpected error: {str(e)}")
+            return f"{text}\n\n[Translation error: {str(e)}]"
     
     def _build_translation_prompt(self, text: str, preserve_terms: List[str]) -> str:
         """
