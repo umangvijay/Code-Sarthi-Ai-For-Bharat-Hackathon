@@ -12,8 +12,9 @@ from typing import Optional
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from botocore.exceptions import ClientError
 
-# Hybrid Mode Configuration
-USE_AWS = os.getenv("USE_AWS", "False") == "True"
+# Force AWS Mode - EC2 with IAM Role
+# Set USE_AWS=False in environment to disable (for local development only)
+USE_AWS = os.getenv("USE_AWS", "True") == "True"
 
 
 class BedrockClient:

@@ -451,8 +451,8 @@ def generate_iam_policy_document() -> Dict[str, any]:
         'Effect': 'Allow',
         'Action': permissions['s3'],
         'Resource': [
-            'arn:aws:s3:::code-sarthi-pdfs',
-            'arn:aws:s3:::code-sarthi-pdfs/*'
+            'arn:aws:s3:::code-sarthi-pdfs-umang-live',
+            'arn:aws:s3:::code-sarthi-pdfs-umang-live/*'
         ]
     })
     

@@ -1,25 +1,25 @@
 """
 AWS Configuration and Credential Validation
-Handles AWS service setup and credential checking with Hybrid Mode support
+Handles AWS service setup and credential checking for EC2 IAM Role authentication
 """
 
 import boto3
 import os
 from botocore.exceptions import ClientError, NoCredentialsError
 
-# Hybrid Mode Configuration
-USE_AWS = os.getenv("USE_AWS", "False") == "True"
+# AWS Mode Configuration - Enable AWS services when USE_AWS=true
+USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
 
-# S3 Bucket Configuration - Hardcoded default
-S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "code-sarthi-pdfs-umang")
+# S3 Bucket Configuration - Live production bucket
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "code-sarthi-pdfs-umang-live")
 
 
 class AWSConfig:
-    """Manages AWS configuration and validates credentials"""
+    """Manages AWS configuration and validates credentials using EC2 IAM Role"""
     
     def __init__(self, region_name="us-east-1"):
         """
-        Initialize AWS configuration with Hybrid Mode support
+        Initialize AWS configuration with EC2 IAM Role support
         
         Args:
             region_name: AWS region (default: us-east-1)
@@ -28,45 +28,51 @@ class AWSConfig:
         self.services_status = {}
         self.use_aws = USE_AWS
         
-        # Use IAM roles via boto3.Session() for security
+        # Initialize boto3 session - automatically uses EC2 IAM role if available
         if self.use_aws:
             self.session = boto3.Session()
         else:
             self.session = None
+            print("⚠️  WARNING: USE_AWS is disabled. AWS services will not be available.")
     
     def validate_credentials(self):
         """
-        Validate AWS credentials are configured (Hybrid Mode aware)
+        Validate AWS credentials (EC2 IAM Role or configured credentials)
         
         Returns:
             tuple: (is_valid, error_message)
         """
-        # Local mode - skip AWS validation
         if not self.use_aws:
-            return True, "🔵 Local Offline Mode: AWS validation skipped"
+            return False, "❌ AWS services disabled (USE_AWS=false)"
         
         try:
-            # Try to get caller identity using IAM role
+            # Get caller identity using IAM role or configured credentials
             sts = self.session.client('sts', region_name=self.region_name)
             identity = sts.get_caller_identity()
             
-            return True, f"✅ AWS credentials valid (Account: {identity['Account']})"
+            # Determine credential source
+            arn = identity.get('Arn', '')
+            if 'assumed-role' in arn:
+                cred_source = "EC2 IAM Role"
+            elif 'user' in arn:
+                cred_source = "IAM User"
+            else:
+                cred_source = "IAM Credentials"
+            
+            return True, f"✅ AWS credentials valid ({cred_source}, Account: {identity['Account']})"
         
         except NoCredentialsError:
             return False, """
 ❌ AWS credentials not configured!
 
-To configure AWS credentials, run:
-    aws configure
+For EC2: Attach an IAM Role with required permissions
+For Local: Run 'aws configure' with your credentials
 
-You'll need:
-1. AWS Access Key ID
-2. AWS Secret Access Key
-3. Default region (us-east-1)
-4. Default output format (json)
-
-Get credentials from AWS Console:
-https://console.aws.amazon.com/iam/home#/security_credentials
+Required permissions:
+- bedrock:InvokeModel
+- s3:GetObject, s3:PutObject, s3:ListBucket
+- polly:SynthesizeSpeech (optional)
+- transcribe:StartTranscriptionJob (optional)
 """
         
         except ClientError as e:
@@ -77,21 +83,21 @@ https://console.aws.amazon.com/iam/home#/security_credentials
     
     def check_bedrock_access(self):
         """
-        Check if Bedrock service is accessible (Hybrid Mode aware)
+        Check if Bedrock Runtime service is accessible
         
         Returns:
             tuple: (is_accessible, message)
         """
-        # Local mode - return mock success
         if not self.use_aws:
-            return True, "🔵 Local Mode: Bedrock simulation active"
+            return False, "❌ AWS services disabled (USE_AWS=false)"
         
         try:
+            # Initialize Bedrock Runtime client
             bedrock = self.session.client('bedrock-runtime', region_name=self.region_name)
             
-            # Try a simple model invocation to check access
-            # This will fail if model not enabled, but that's okay
-            return True, "✅ Bedrock service accessible"
+            # Bedrock Runtime doesn't have a simple health check API
+            # We'll just verify the client was created successfully
+            return True, "✅ Bedrock Runtime service accessible"
         
         except ClientError as e:
             error_code = e.response['Error']['Code']
@@ -99,13 +105,13 @@ https://console.aws.amazon.com/iam/home#/security_credentials
                 return False, """
 ❌ Bedrock access denied!
 
-Your AWS account needs:
-1. Bedrock service enabled in your region
-2. Claude 3.5 Sonnet model access requested
+Your AWS account/role needs:
+1. Bedrock service enabled in us-east-1
+2. Model access enabled (Amazon Nova Lite)
 3. IAM permissions for bedrock:InvokeModel
 
-Enable Bedrock:
-https://console.aws.amazon.com/bedrock/home#/modelaccess
+Enable model access:
+https://console.aws.amazon.com/bedrock/home?region=us-east-1#/modelaccess
 """
             return False, f"❌ Bedrock error: {str(e)}"
         
@@ -114,14 +120,13 @@ https://console.aws.amazon.com/bedrock/home#/modelaccess
     
     def check_s3_access(self):
         """
-        Check if S3 service is accessible (Hybrid Mode aware)
+        Check if S3 service is accessible
         
         Returns:
             tuple: (is_accessible, message)
         """
-        # Local mode - return mock success
         if not self.use_aws:
-            return True, "🔵 Local Mode: S3 simulation active"
+            return False, "❌ AWS services disabled (USE_AWS=false)"
         
         try:
             s3 = self.session.client('s3', region_name=self.region_name)
@@ -138,14 +143,13 @@ https://console.aws.amazon.com/bedrock/home#/modelaccess
 
     def check_polly_access(self):
         """
-        Check if Polly service is accessible (Hybrid Mode aware)
+        Check if Polly service is accessible (optional for voice features)
         
         Returns:
             tuple: (is_accessible, message)
         """
-        # Local mode - return mock success
         if not self.use_aws:
-            return True, "🔵 Local Mode: Polly simulation active"
+            return False, "❌ AWS services disabled (USE_AWS=false)"
         
         try:
             polly = self.session.client('polly', region_name=self.region_name)
@@ -156,7 +160,7 @@ https://console.aws.amazon.com/bedrock/home#/modelaccess
         except ClientError as e:
             error_code = e.response['Error']['Code']
             if error_code == 'AccessDeniedException':
-                return False, "⚠️  Polly access denied (optional for viva features)"
+                return False, "⚠️  Polly access denied (optional for voice features)"
             return False, f"⚠️  Polly error: {str(e)} (optional)"
         
         except Exception as e:
@@ -164,35 +168,45 @@ https://console.aws.amazon.com/bedrock/home#/modelaccess
     
     def check_all_services(self):
         """
-        Check all AWS services and return status (Hybrid Mode aware)
+        Check all AWS services and return status
         
         Returns:
             dict: Service status dictionary
         """
-        mode_indicator = "🔵 LOCAL OFFLINE" if not self.use_aws else "🟢 AWS CLOUD"
-        print(f"🔍 Checking services... ({mode_indicator})")
+        if not self.use_aws:
+            print("⚠️  AWS services disabled (USE_AWS=false)")
+            print("-" * 60)
+            self.services_status['mode'] = 'disabled'
+            self.services_status['credentials'] = False
+            self.services_status['bedrock'] = False
+            self.services_status['s3'] = False
+            self.services_status['polly'] = False
+            return self.services_status
+        
+        print(f"🔍 Checking AWS services... (Region: {self.region_name})")
         print("-" * 60)
         
         # Check credentials first
         cred_valid, cred_msg = self.validate_credentials()
         print(cred_msg)
         self.services_status['credentials'] = cred_valid
-        self.services_status['mode'] = 'local' if not self.use_aws else 'aws'
+        self.services_status['mode'] = 'aws'
         
-        if not cred_valid and self.use_aws:
+        if not cred_valid:
+            print("-" * 60)
             return self.services_status
         
-        # Check Bedrock (required)
+        # Check Bedrock Runtime (required)
         bedrock_ok, bedrock_msg = self.check_bedrock_access()
         print(bedrock_msg)
         self.services_status['bedrock'] = bedrock_ok
         
-        # Check S3 (optional)
+        # Check S3 (required for PDF uploads)
         s3_ok, s3_msg = self.check_s3_access()
         print(s3_msg)
         self.services_status['s3'] = s3_ok
         
-        # Check Polly (optional)
+        # Check Polly (optional for voice features)
         polly_ok, polly_msg = self.check_polly_access()
         print(polly_msg)
         self.services_status['polly'] = polly_ok
@@ -203,7 +217,7 @@ https://console.aws.amazon.com/bedrock/home#/modelaccess
     
     def get_service_status_summary(self):
         """
-        Get a summary of service status (Hybrid Mode aware)
+        Get a summary of service status
         
         Returns:
             str: Status summary
@@ -211,25 +225,26 @@ https://console.aws.amazon.com/bedrock/home#/modelaccess
         if not self.services_status:
             return "⚠️  Services not checked yet"
         
-        # Local mode always ready
         if not self.use_aws:
-            return "🔵 Local Offline Mode: All services simulated"
+            return "❌ AWS services disabled (USE_AWS=false)"
         
         required_ok = self.services_status.get('credentials', False) and \
                      self.services_status.get('bedrock', False)
         
         if required_ok:
-            return "✅ All required services ready"
+            return "✅ All required AWS services ready"
         else:
-            return "❌ Some required services unavailable"
+            return "❌ Some required AWS services unavailable"
     
-    def is_local_mode(self) -> bool:
-        """Check if running in local offline mode"""
-        return not self.use_aws
+    def is_aws_enabled(self) -> bool:
+        """Check if AWS services are enabled"""
+        return self.use_aws
     
     def get_mode_display(self) -> str:
         """Get display string for current mode"""
-        return "🔵 Local Offline" if not self.use_aws else "🟢 AWS Cloud"
+        if not self.use_aws:
+            return "❌ AWS Disabled"
+        return "🟢 AWS Cloud"
 
 
 def test_aws_config():

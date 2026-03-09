@@ -51,7 +51,7 @@ class RAGEngine:
         region_name: str = "us-east-1",
         metadata_file: str = "pdf_metadata.json",
         use_aws: bool = True,
-        s3_bucket_name: str = "code-sarthi-pdfs-umang"
+        s3_bucket_name: str = "code-sarthi-pdfs-umang-live"
     ):
         """
         Initialize RAG Engine with FAISS + Titan Embeddings
