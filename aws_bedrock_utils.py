@@ -71,17 +71,9 @@ class BedrockClient:
         """
         self.use_aws = USE_AWS
         self.region_name = region_name
-        # Model ID for code explanation
-        # self.model_id = "amazon.nova-lite-v1:0"  # Previous: Nova Lite (commented out due to throttling)
-        # self.model_id = "amazon.titan-text-express-v1"  # Previous: Titan Text Express
-        # self.model_id = "google.gemma-3-12b-it-v1:0"  # Previous: Google Gemma 3 12B (AWS event requirement)
-        # self.model_id = "amazon.nova-micro-v1:0"  # Previous: Nova Micro in ap-northeast-3
-        # self.model_id = "anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Raw model ID (doesn't support on-demand)
-        # self.model_id = "us.anthropic.claude-3-5-sonnet-20241022-v2:0"  # Previous: Claude inference profile
-        # self.model_id = "us.amazon.nova-lite-v1:0"  # Previous: Nova Lite cross-region (hit daily token limit)
-        # self.model_id = "anthropic.claude-3-haiku-20240307-v1:0"  # Previous: Claude 3 Haiku (hit token limit)
-        # self.model_id = "amazon.nova-lite-v1:0"  # Previous: Amazon Nova 2 Lite in ap-south-1 (Mumbai)
-        self.model_id = "amazon.nova-2-lite-v1:0"  # Current: Amazon Nova 2 Lite in ap-south-1 (Mumbai)
+        # Model ID: Cross-region inference profile for Amazon Nova 2 Lite
+        # This enables cross-region inference routing and resolves ValidationException
+        self.model_id = "us.amazon.nova-2-lite-v1:0"
         
         if self.use_aws:
             # Use IAM roles via boto3.Session() for security
