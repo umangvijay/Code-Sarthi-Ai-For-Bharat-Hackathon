@@ -42,7 +42,17 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from botocore.exceptions import ClientError
 
 # Hybrid Mode Configuration
-USE_AWS = os.getenv("USE_AWS", "False") == "True"
+USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
+
+
+def is_aws_ready():
+    """Check if AWS services are ready from session state"""
+    try:
+        import streamlit as st
+        return st.session_state.get("aws_ready", False)
+    except:
+        # If not in Streamlit context, just check USE_AWS
+        return USE_AWS
 
 
 class TranslationEngine:
@@ -228,11 +238,14 @@ class TranslationEngine:
         Returns:
             Translated text with natural Hindi phrasing
         """
-        # Check AWS mode
-        if self.use_aws:
+        # Check AWS mode and readiness
+        if self.use_aws and is_aws_ready():
             print("🟢 AWS Mode: Using Bedrock translation")
         else:
-            print("🔵 Local Mode: Translation simulation")
+            if self.use_aws and not is_aws_ready():
+                print("🔴 AWS not ready, falling back to Local Mode")
+            else:
+                print("🔵 Local Mode: Translation simulation")
             return f"🔵 Local Mode: Translation simulation\n\n{text}\n\n(Enable AWS mode for full Hinglish translation)"
         
         # Build the translation prompt

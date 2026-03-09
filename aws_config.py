@@ -240,6 +240,30 @@ https://console.aws.amazon.com/bedrock/home?region=us-east-1#/modelaccess
         """Check if AWS services are enabled"""
         return self.use_aws
     
+    def validate_aws(self):
+        """
+        Validate AWS services are ready for use
+        
+        Returns:
+            tuple: (is_ready, message)
+        """
+        if not self.use_aws:
+            return False, "❌ AWS services disabled (USE_AWS=false)"
+        
+        # Check if services have been validated
+        if not self.services_status:
+            # Run service checks
+            self.check_all_services()
+        
+        # Verify required services are available
+        credentials_ok = self.services_status.get('credentials', False)
+        bedrock_ok = self.services_status.get('bedrock', False)
+        
+        if credentials_ok and bedrock_ok:
+            return True, "✅ AWS services ready"
+        else:
+            return False, "❌ Required AWS services unavailable"
+    
     def get_mode_display(self) -> str:
         """Get display string for current mode"""
         if not self.use_aws:

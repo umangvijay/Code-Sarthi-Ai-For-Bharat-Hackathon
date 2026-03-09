@@ -14,7 +14,17 @@ from botocore.exceptions import ClientError
 
 # Force AWS Mode - EC2 with IAM Role
 # Set USE_AWS=False in environment to disable (for local development only)
-USE_AWS = os.getenv("USE_AWS", "True") == "True"
+USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
+
+
+def is_aws_ready():
+    """Check if AWS services are ready from session state"""
+    try:
+        import streamlit as st
+        return st.session_state.get("aws_ready", False)
+    except:
+        # If not in Streamlit context, just check USE_AWS
+        return USE_AWS
 
 
 class TranscribeSTT:
@@ -97,11 +107,14 @@ class TranscribeSTT:
         if language not in self.LANGUAGE_CONFIGS:
             raise ValueError(f"Invalid language: {language}. Must be one of {list(self.LANGUAGE_CONFIGS.keys())}")
         
-        # Check AWS mode
-        if self.use_aws:
+        # Check AWS mode and readiness
+        if self.use_aws and is_aws_ready():
             print(f"🟢 AWS Mode: Using Transcribe STT ({len(audio_bytes)} bytes)")
         else:
-            print(f"🔵 Local Mode: STT simulation ({len(audio_bytes)} bytes)")
+            if self.use_aws and not is_aws_ready():
+                print(f"🔴 AWS not ready, falling back to Local Mode ({len(audio_bytes)} bytes)")
+            else:
+                print(f"🔵 Local Mode: STT simulation ({len(audio_bytes)} bytes)")
             return {
                 'transcript': "Local Mode: Speech-to-text simulation. Actual transcription requires AWS mode.",
                 'confidence': 0.0,

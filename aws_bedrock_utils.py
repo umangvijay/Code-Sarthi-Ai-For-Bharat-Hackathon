@@ -14,7 +14,17 @@ from botocore.exceptions import ClientError
 
 # Force AWS Mode - EC2 with IAM Role
 # Set USE_AWS=False in environment to disable (for local development only)
-USE_AWS = os.getenv("USE_AWS", "True") == "True"
+USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
+
+
+def is_aws_ready():
+    """Check if AWS services are ready from session state"""
+    try:
+        import streamlit as st
+        return st.session_state.get("aws_ready", False)
+    except:
+        # If not in Streamlit context, just check USE_AWS
+        return USE_AWS
 
 
 class BedrockClient:
@@ -71,11 +81,14 @@ class BedrockClient:
         Returns:
             dict with 'explanation' and 'language_detected' keys
         """
-        # Check AWS mode
-        if self.use_aws:
+        # Check AWS mode and readiness
+        if self.use_aws and is_aws_ready():
             print("🟢 AWS Mode: Using Bedrock for code explanation")
         else:
-            print("🔵 Local Mode: AI simulation")
+            if self.use_aws and not is_aws_ready():
+                print("🔴 AWS not ready, falling back to Local Mode")
+            else:
+                print("🔵 Local Mode: AI simulation")
             language = self._detect_language(code_snippet)
             return {
                 "status": "success",

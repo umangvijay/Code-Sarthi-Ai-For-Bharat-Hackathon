@@ -12,7 +12,17 @@ from botocore.exceptions import ClientError
 
 # Force AWS Mode - EC2 with IAM Role
 # Set USE_AWS=False in environment to disable (for local development only)
-USE_AWS = os.getenv("USE_AWS", "True") == "True"
+USE_AWS = os.getenv("USE_AWS", "true").lower() == "true"
+
+
+def is_aws_ready():
+    """Check if AWS services are ready from session state"""
+    try:
+        import streamlit as st
+        return st.session_state.get("aws_ready", False)
+    except:
+        # If not in Streamlit context, just check USE_AWS
+        return USE_AWS
 
 
 class PollyTTS:
@@ -104,11 +114,14 @@ class PollyTTS:
         if voice_type not in self.VOICE_CONFIGS:
             raise ValueError(f"Invalid voice_type: {voice_type}. Must be one of {list(self.VOICE_CONFIGS.keys())}")
         
-        # Check AWS mode
-        if self.use_aws:
+        # Check AWS mode and readiness
+        if self.use_aws and is_aws_ready():
             print(f"🟢 AWS Mode: Using Polly TTS for: {text[:50]}...")
         else:
-            print(f"🔵 Local Mode: TTS simulation for: {text[:50]}...")
+            if self.use_aws and not is_aws_ready():
+                print(f"🔴 AWS not ready, falling back to Local Mode for: {text[:50]}...")
+            else:
+                print(f"🔵 Local Mode: TTS simulation for: {text[:50]}...")
             # Return minimal valid MP3 header (silent audio)
             return b'\xff\xfb\x90\x00' + b'\x00' * 100
         

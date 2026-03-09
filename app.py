@@ -16,7 +16,7 @@ import json
 import streamlit as st
 from streamlit_option_menu import option_menu
 
-from aws_config import AWSConfig
+from aws_config import AWSConfig, USE_AWS
 from monitoring_analytics import get_analytics
 from translation_engine import TranslationEngine
 from utils.theme_manager import ThemeManager
@@ -31,6 +31,12 @@ st.set_page_config(
 )
 
 
+@st.cache_resource
+def initialize_aws_config():
+    """Initialize AWS configuration (cached per session)"""
+    return AWSConfig(region_name="us-east-1")
+
+
 def initialize_session_state() -> None:
     """Initialize all session state variables"""
     defaults = {
@@ -39,6 +45,7 @@ def initialize_session_state() -> None:
         "theme_manager": None,
         "translation_engine": None,
         "aws_config": None,
+        "aws_ready": False,
         "services_checked": False,
         "translation_count": 0,
         "pdf_count": 0,
@@ -60,19 +67,36 @@ def initialize_session_state() -> None:
 def check_aws_services():
     """Check AWS service availability and initialize clients"""
     if st.session_state.services_checked:
-        return True, "Services already checked"
+        return st.session_state.aws_ready, "Services already checked"
 
     try:
-        st.session_state.aws_config = AWSConfig()
-        services_status = st.session_state.aws_config.check_all_services()
+        # Initialize AWS config (cached)
+        st.session_state.aws_config = initialize_aws_config()
+        
+        # Validate AWS services
+        valid, message = st.session_state.aws_config.validate_aws()
+        st.session_state.aws_ready = valid
         st.session_state.services_checked = True
-
-        if services_status.get("credentials") and services_status.get("bedrock"):
+        
+        if valid:
+            print("🟢 AWS services ready")
             st.session_state.translation_engine = TranslationEngine()
-            return True, "All required services ready"
-        return False, "Required AWS services unavailable. Configure credentials first."
+            return True, "✅ All required AWS services ready"
+        else:
+            print("🔴 AWS services not ready:", message)
+            # Still initialize translation engine for local mode fallback
+            st.session_state.translation_engine = TranslationEngine()
+            return False, message
+            
     except Exception as exc:
         st.session_state.services_checked = True
+        st.session_state.aws_ready = False
+        print(f"🔴 AWS initialization failed: {exc}")
+        # Initialize translation engine for local mode fallback
+        try:
+            st.session_state.translation_engine = TranslationEngine()
+        except:
+            pass
         return False, f"AWS initialization failed: {exc}"
 
 
@@ -96,10 +120,21 @@ def render_sidebar() -> None:
         # Mode Indicator
         if st.session_state.aws_config:
             mode_display = st.session_state.aws_config.get_mode_display()
-            mode_class = "status-info" if "Local" in mode_display else "status-success"
+            aws_ready = st.session_state.get("aws_ready", False)
+            
+            if aws_ready:
+                mode_class = "status-success"
+                status_text = "🟢 AWS Cloud Mode"
+            elif USE_AWS:
+                mode_class = "status-error"
+                status_text = "🔴 AWS Not Ready"
+            else:
+                mode_class = "status-info"
+                status_text = "🔵 Local Mode"
+                
             st.markdown(f"""
                 <div class='status-box {mode_class}' style='text-align: center; margin-bottom: 1rem;'>
-                    <strong>Mode:</strong> {mode_display}
+                    <strong>Mode:</strong> {status_text}
                 </div>
             """, unsafe_allow_html=True)
         
